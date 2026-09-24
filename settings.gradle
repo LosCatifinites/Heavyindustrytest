@@ -1,0 +1,2 @@
+// 项目名 = jar 文件名。不要改成中文/带空格，否则 jar 名会出问题。
+rootProject.name = "heavy-industry"

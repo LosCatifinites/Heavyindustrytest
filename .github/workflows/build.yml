@@ -1,0 +1,65 @@
+# ============================================================
+#  重工业（Heavy industry）Java 版 —— GitHub 云编译
+#  push 后自动编译，在仓库 Actions 页面下载 jar 产物
+#  产物同时支持 桌面端 与 安卓端（安卓靠里面的 classes.dex）
+# ============================================================
+name: Build Mod Jar
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 安装 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v4
+
+      # ubuntu-latest 自带 Android SDK（build-tools + platforms）。
+      # d8 必须能在 PATH 里被找到，build.gradle 的 jarAndroid 任务会直接调用 d8。
+      - name: 探测 Android SDK（d8 / android.jar）
+        id: sdk
+        run: |
+          set -e
+          echo "ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" >> "$GITHUB_ENV"
+          D8="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -maxdepth 2 -name d8 -type f | sort -V | tail -1)"
+          if [ -z "$D8" ]; then echo "❌ 未找到 d8"; ls -R "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" | head -20; exit 1; fi
+          echo "d8 = $D8"
+          echo "$(dirname "$D8")" >> "$GITHUB_PATH"
+
+      - name: 编译（gradlew deploy：桌面 jar + dex + 合并）
+        run: |
+          set -e
+          chmod +x ./gradlew
+          ./gradlew deploy --no-daemon --stacktrace
+
+      - name: 检查产物
+        run: |
+          set -e
+          ls -la build/libs/
+          JAR="build/libs/${{ github.event.repository.name }}.jar"
+          test -f "$JAR" || { echo "❌ 未找到 $JAR（请确认仓库名与 settings.gradle 的 rootProject.name 一致）"; exit 1; }
+          unzip -l "$JAR" | grep -E 'classes\.dex|mod\.hjson' || true
+          unzip -l "$JAR" | grep -q 'classes\.dex' || { echo "❌ jar 内缺少 classes.dex，安卓端无法加载"; exit 1; }
+          echo "✅ 产物校验通过"
+
+      - name: 上传 jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: heavy-industry-jar
+          path: build/libs/*.jar
+          if-no-files-found: error
+          compression-level: 0

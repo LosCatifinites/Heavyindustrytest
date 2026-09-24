@@ -1,14 +1,17 @@
+// ============================================================
+//  Heavy industry（重工业）Java 版 构建脚本
+//  基于官方 Anuken/MindustryJavaModTemplate，仅改了版本与产物命名
+// ============================================================
 apply plugin: "java"
 
 sourceSets.main.java.srcDirs = ["src"]
 
 ext{
-    // Mindustry version to depend on.
-    // Valid values:
-    // - latest: depend on the latest release of mindustry
-    // - be: depend on the very latest commit of mindustry
-    // - v<number>: depend on a specific version
-    mindustryVersion = "v160"
+    // 目标 Mindustry 版本。可用值：
+    //   latest   -> 最新正式版
+    //   be       -> 最新提交（BE 构建）
+    //   v<数字>  -> 指定版本（本项目用 v158）
+    mindustryVersion = "v158"
     isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
     sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
 }
@@ -16,19 +19,19 @@ ext{
 repositories{
     mavenCentral()
 
-    //Downloads the dependencies JAR file from Mindustry releases; does not use any real repository. Surprisingly, this is the most reliable option.
+    // 从 Mindustry 的 GitHub Release 直接取 dependencies.jar（Anuken 官方模板的做法，
+    // 不依赖 Maven 仓库，实测最稳）。v158 的 dependencies.jar 约 11.6MB，确实存在。
     ivy{
         url = 'https://github.com/'
         patternLayout{ artifact(
-            (mindustryVersion == "latest" ? '/[organisation]/[module]/releases/[revision]/download/dependencies.jar' : //latest stable release
-            mindustryVersion == "be" ? '/[organisation]/[module]/releases/download/master/[revision].jar' : //latest commit (BE)
-            '/[organisation]/[module]/releases/download/[revision]/dependencies.jar')) //specific release
+            (mindustryVersion == "latest" ? '/[organisation]/[module]/releases/[revision]/download/dependencies.jar' :
+             mindustryVersion == "be"     ? '/[organisation]/[module]/releases/download/master/[revision].jar' :
+                                            '/[organisation]/[module]/releases/download/[revision]/dependencies.jar'))
         }
         metadataSources{ artifact() }
 
         content{
             if(mindustryVersion == "be"){
-                //BE artifact version is always 'latest'
                 includeVersion("Anuken", "MindustryBuilds", "latest")
             }else{
                 includeVersion("Anuken", "Mindustry", mindustryVersion)
@@ -38,63 +41,81 @@ repositories{
 }
 
 java{
-    targetCompatibility = JavaVersion.VERSION_17
     sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach{
+    options.encoding = "UTF-8"
 }
 
 dependencies{
+    // 注意：Mindustry / Arc 必须是 compileOnly，绝不能写成 implementation，
+    // 否则整个游戏 API 会被打进你的 mod jar。
     compileOnly mindustryVersion == "be" ? "Anuken:MindustryBuilds:latest" : "Anuken:Mindustry:$mindustryVersion"
 }
 
+// ---------- 桌面版 jar（可直接用于桌面端测试） ----------
+jar{
+    archiveFileName = "${project.name}Desktop.jar"
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from{
+        configurations.runtimeClasspath.collect{ it.isDirectory() ? it : zipTree(it) }
+    }
+    // mod.hjson 放到 jar 根
+    from(projectDir){ include "mod.hjson" }
+    // ★ assets/ 的「内容」会被平铺到 jar 根，
+    //   即 assets/sprites/x.png -> jar 内 sprites/x.png
+    //   这正是 Mindustry 读取模组资源的位置（mod.root.child("sprites")）
+    from("assets/"){ include "**" }
+    // 兼容：如果以后把资源直接放仓库根目录（像 JS 版那样），也一并打进去
+    ["bundles","sprites","sprites-override","content","sounds","music","maps","schematics","scripts"].each{ d ->
+        if(file(d).exists()){ from(d){ into d } }
+    }
+}
+
+// ---------- 安卓版 jar（javac -> d8 -> dex） ----------
 tasks.register('jarAndroid'){
     dependsOn "jar"
     def projectName = project.name
 
     doLast{
-        if(!sdkRoot || !new File(sdkRoot).exists()) throw new GradleException("No valid Android SDK found. Ensure that ANDROID_HOME is set to your Android SDK directory.")
+        if(!sdkRoot || !new File(sdkRoot).exists())
+            throw new GradleException("未找到 Android SDK，请设置 ANDROID_HOME 环境变量。")
 
-        def platformRoot = new File("$sdkRoot/platforms/").listFiles().sort().reverse().find{ f -> new File(f, "android.jar").exists() }
+        def platformRoot = new File("$sdkRoot/platforms/").listFiles()
+            ?.sort()?.reverse()?.find{ f -> new File(f, "android.jar").exists() }
+        if(!platformRoot)
+            throw new GradleException("未找到 android.jar，请安装任意 Android platform。")
 
-        if(!platformRoot) throw new GradleException("No android.jar found. Ensure that you have an Android platform installed.")
-
-        //collect dependencies needed for desugaring
-        def dependencies = (configurations.compileClasspath.asList() + configurations.runtimeClasspath.asList() + [new File(platformRoot, "android.jar")]).collect{ "--classpath $it.path" }.join(" ")
+        def dependencies = (configurations.compileClasspath.asList() +
+                            configurations.runtimeClasspath.asList() +
+                            [new File(platformRoot, "android.jar")])
+                            .collect{ "--classpath $it.path" }.join(" ")
 
         def d8 = isWindows ? "d8.bat" : "d8"
-
-        //dex and desugar files - this requires d8 in your PATH
+        // 安卓只认 jar 里的 classes.dex，不认 .class
         "$d8 $dependencies --min-api 21 --output ${projectName}Android.jar ${projectName}Desktop.jar"
-                .execute(null, new File("build/libs")).waitForProcessOutput(System.out, System.err)
+            .execute(null, new File("build/libs")).waitForProcessOutput(System.out, System.err)
     }
 }
 
-jar{
-    archiveFileName = "${project.name}Desktop.jar"
-
-    from{
-        configurations.runtimeClasspath.collect{ it.isDirectory() ? it : zipTree(it) }
-    }
-
-    from(projectDir){
-        include "mod.hjson"
-    }
-
-    from("assets/"){
-        include "**"
-    }
-}
-
+// ---------- 合并成最终 jar（桌面 + 安卓 通吃） ----------
 tasks.register('deploy', Jar){
     def projectName = project.name
     dependsOn jarAndroid
     dependsOn jar
     archiveFileName = "${projectName}.jar"
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    from{ [zipTree("build/libs/${projectName}Desktop.jar"), zipTree("build/libs/${projectName}Android.jar")] }
+    from{ [zipTree("build/libs/${projectName}Desktop.jar"),
+           zipTree("build/libs/${projectName}Android.jar")] }
 
     doLast{
-        delete{
-            delete "build/libs/${projectName}Android.jar"
-        }
+        // 清掉中间产物，避免 CI 上传时把它们也带上
+        delete "build/libs/${projectName}Android.jar"
+        delete "build/libs/${projectName}Desktop.jar"
+        println "✅ 产物: build/libs/${projectName}.jar"
     }
 }

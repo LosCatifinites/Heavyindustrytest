@@ -1,23 +1,24 @@
-#the mod name as displayed in-game
-displayName: "Java Mod Template"
+# 游戏内显示的模组名
+displayName: "Heavy industry"
 
-#the internal name of your mod
-name: "example-java-mod"
+# ★★ 内部名必须保持 "重工业" ★★
+# Mindustry 会把内容名和 bundle key 自动加上「模组名-」前缀
+# （见官方 ContentParser.java: `<mod> + "-" + name`）。
+# 若改成别的名字，现有 113 个 content/*.json、bundles、贴图名（重工业-xxx）、
+# 存档与科技树引用全部会失配。改名前请务必确认。
+name: "重工业"
 
-#your name
-author: "You"
+author: "樱洛清"
 
-#the fully qualified main class of the mod
-main: "example.ExampleJavaMod"
+# Java 模组入口类（全限定名）
+main: "hiy.HeavyIndustry"
 
-#the mod description as seen in the mod dialog
-description: "A Mindustry Java mod template."
+description: "专注于扩展以及更多的内容\n模组版本2.1 Java 版"
 
-#the mod version
-version: 1.0.0
+version: "2.1"
 
-#the minimum game build required to run this mod
-minGameVersion: 160.3
+# Java 模组要求 >= 154（见官方 Mods.java: meta.getMinMajor() >= minJavaModGameVersion）
+minGameVersion: 158
 
-#this is a java mod
+# 声明这是 Java 模组
 java: true

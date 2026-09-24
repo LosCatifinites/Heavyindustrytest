@@ -155,3 +155,10 @@ gradle-app.setting
 .DS_Store
 Thumbs.db
 android/libs/
+
+## ---- Heavy industry Java mod ----
+/build/
+.gradle/
+out/
+local.properties
+*.hprof
