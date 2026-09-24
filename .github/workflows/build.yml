@@ -34,10 +34,15 @@ jobs:
         id: sdk
         run: |
           set -e
-          echo "ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" >> "$GITHUB_ENV"
-          D8="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -maxdepth 2 -name d8 -type f | sort -V | tail -1)"
-          if [ -z "$D8" ]; then echo "❌ 未找到 d8"; ls -R "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" | head -20; exit 1; fi
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          D8="$(find "$SDK/build-tools" -maxdepth 2 -name d8 -type f | sort -V | tail -1)"
+          AJAR="$(find "$SDK/platforms" -maxdepth 2 -name android.jar -type f | sort -V | tail -1)"
+          if [ -z "$D8" ];   then echo "❌ 未找到 d8"; ls -R "$SDK/build-tools" | head -20; exit 1; fi
+          if [ -z "$AJAR" ]; then echo "❌ 未找到 android.jar"; ls "$SDK/platforms"; exit 1; fi
           echo "d8 = $D8"
+          echo "android.jar = $AJAR"
           echo "$(dirname "$D8")" >> "$GITHUB_PATH"
 
       - name: 编译（gradlew deploy：桌面 jar + dex + 合并）
@@ -46,15 +51,19 @@ jobs:
           chmod +x ./gradlew
           ./gradlew deploy --no-daemon --stacktrace
 
+      # 产物名 = settings.gradle 里的 rootProject.name，与 GitHub 仓库名无关，
+      # 所以这里用通配符查找，避免仓库改名导致校验失败。
       - name: 检查产物
         run: |
           set -e
+          echo "--- build/libs ---"
           ls -la build/libs/
-          JAR="build/libs/${{ github.event.repository.name }}.jar"
-          test -f "$JAR" || { echo "❌ 未找到 $JAR（请确认仓库名与 settings.gradle 的 rootProject.name 一致）"; exit 1; }
+          JAR="$(ls build/libs/*.jar 2>/dev/null | head -1)"
+          if [ -z "$JAR" ]; then echo "❌ build/libs 下没有 jar"; exit 1; fi
+          echo "产物: $JAR"
           unzip -l "$JAR" | grep -E 'classes\.dex|mod\.hjson' || true
           unzip -l "$JAR" | grep -q 'classes\.dex' || { echo "❌ jar 内缺少 classes.dex，安卓端无法加载"; exit 1; }
-          echo "✅ 产物校验通过"
+          echo "✅ 产物校验通过（jar 名: $(basename "$JAR")）"
 
       - name: 上传 jar
         uses: actions/upload-artifact@v4
