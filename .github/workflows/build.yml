@@ -1,7 +1,11 @@
 # ============================================================
 #  重工业（Heavy industry）Java 版 —— GitHub 云编译
 #  push 后自动编译，在仓库 Actions 页面下载 jar 产物
-#  产物同时支持 桌面端 与 安卓端（安卓靠里面的 classes.dex）
+#  流程：javac -> d8 -> jar（安卓只认 jar 里的 classes.dex）
+#
+#  走 nogradle 路线的原因：本机 wrapper 是 Gradle 9.4.1，而
+#  build.gradle 的 jarAndroid 用了 Groovy 的 String.execute()，
+#  该 API 在 Gradle 9 中已不可靠。此路线不依赖 Gradle，实测最稳。
 # ============================================================
 name: Build Mod Jar
 
@@ -14,61 +18,83 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    env:
+      # 目标版本 = 本机实测的游戏版本 Mindustry v8 Build 160.5
+      MD_VER: v160.5
+      MIN_API: '21'
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: 安装 JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
           java-version: '17'
+          distribution: temurin
 
-      - name: 安装 Gradle 缓存
-        uses: gradle/actions/setup-gradle@v4
-
-      # ubuntu-latest 自带 Android SDK（build-tools + platforms）。
-      # d8 必须能在 PATH 里被找到，build.gradle 的 jarAndroid 任务会直接调用 d8。
-      - name: 探测 Android SDK（d8 / android.jar）
+      - name: Locate Android SDK d8 / android.jar
         id: sdk
         run: |
           set -e
-          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
-          D8="$(find "$SDK/build-tools" -maxdepth 2 -name d8 -type f | sort -V | tail -1)"
-          AJAR="$(find "$SDK/platforms" -maxdepth 2 -name android.jar -type f | sort -V | tail -1)"
-          if [ -z "$D8" ];   then echo "❌ 未找到 d8"; ls -R "$SDK/build-tools" | head -20; exit 1; fi
-          if [ -z "$AJAR" ]; then echo "❌ 未找到 android.jar"; ls "$SDK/platforms"; exit 1; fi
-          echo "d8 = $D8"
-          echo "android.jar = $AJAR"
-          echo "$(dirname "$D8")" >> "$GITHUB_PATH"
+          D8="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -name d8 -type f | sort -V | tail -1)"
+          AJAR="$(find "${ANDROID_HOME}/platforms" -maxdepth 2 -name android.jar -type f | sort -V | tail -1)"
+          test -n "$D8"   || { echo "找不到 d8"; ls -R "${ANDROID_HOME}/build-tools" | head; exit 1; }
+          test -n "$AJAR" || { echo "找不到 android.jar"; ls "${ANDROID_HOME}/platforms"; exit 1; }
+          echo "d8=$D8" >> "$GITHUB_OUTPUT"
+          echo "android_jar=$AJAR" >> "$GITHUB_OUTPUT"
+          echo "使用 d8: $D8"
 
-      - name: 编译（gradlew deploy：桌面 jar + dex + 合并）
+      - name: Fetch Mindustry + Arc
         run: |
           set -e
-          chmod +x ./gradlew
-          ./gradlew deploy --no-daemon --stacktrace
+          curl -fsSL -o mindustry-core.jar "https://jitpack.io/com/github/Anuken/Mindustry/core/${MD_VER}/core-${MD_VER}.jar"
+          curl -fsSL -o arc-core.jar       "https://jitpack.io/com/github/Anuken/Arc/arc-core/${MD_VER}/arc-core-${MD_VER}.jar"
+          ls -la mindustry-core.jar arc-core.jar
 
-      # 产物名 = settings.gradle 里的 rootProject.name，与 GitHub 仓库名无关，
-      # 所以这里用通配符查找，避免仓库改名导致校验失败。
-      - name: 检查产物
+      - name: javac
         run: |
           set -e
-          echo "--- build/libs ---"
-          ls -la build/libs/
-          JAR="$(ls build/libs/*.jar 2>/dev/null | head -1)"
-          if [ -z "$JAR" ]; then echo "❌ build/libs 下没有 jar"; exit 1; fi
-          echo "产物: $JAR"
-          unzip -l "$JAR" | grep -E 'classes\.dex|mod\.hjson' || true
-          unzip -l "$JAR" | grep -q 'classes\.dex' || { echo "❌ jar 内缺少 classes.dex，安卓端无法加载"; exit 1; }
-          echo "✅ 产物校验通过（jar 名: $(basename "$JAR")）"
+          mkdir -p out/classes out/dex stage
+          find src -name '*.java' > srcs.txt
+          echo "--- 待编译源文件 ---"
+          cat srcs.txt
+          javac -encoding UTF-8 --release 8 -nowarn \
+                -cp mindustry-core.jar:arc-core.jar \
+                -d out/classes @srcs.txt
 
-      - name: 上传 jar
+      - name: d8 (class -> dex)
+        run: |
+          set -e
+          find out/classes -name '*.class' > cls.txt
+          xargs "${{ steps.sdk.outputs.d8 }}" --release --min-api "${MIN_API}" \
+                --lib "${{ steps.sdk.outputs.android_jar }}" \
+                --lib mindustry-core.jar \
+                --lib arc-core.jar \
+                --output out/dex < cls.txt
+          test -f out/dex/classes.dex
+
+      - name: Package mod jar
+        run: |
+          set -e
+          cp out/dex/classes.dex stage/
+          for f in mod.hjson mod.json icon.png; do [ -f "$f" ] && cp "$f" stage/ || true; done
+          # assets/ 下的内容会被平铺到 jar 根：
+          #   assets/sprites/x.png -> jar 内 sprites/x.png
+          if [ -d assets ]; then
+            find assets -mindepth 1 -maxdepth 1 -exec cp -r {} stage/ \;
+          fi
+          for d in bundles sprites sprites-override sounds music maps shaders scripts; do
+            [ -d "$d" ] && cp -r "$d" stage/ || true
+          done
+          ( cd stage && jar cf ../heavy-industry.jar . )
+          ls -la heavy-industry.jar
+          echo "--- 包内关键文件 ---"
+          unzip -l heavy-industry.jar | grep -E 'classes\.dex|mod\.hjson|clusterLobes|scripts/' || true
+          unzip -l heavy-industry.jar | grep -q 'classes\.dex' || { echo "缺少 classes.dex，安卓端无法加载"; exit 1; }
+
+      - name: Upload jar
         uses: actions/upload-artifact@v4
         with:
           name: heavy-industry-jar
-          path: build/libs/*.jar
+          path: heavy-industry.jar
           if-no-files-found: error
           compression-level: 0

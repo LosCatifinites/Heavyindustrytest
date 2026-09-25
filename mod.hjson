@@ -18,7 +18,9 @@ description: "专注于扩展以及更多的内容\n模组版本2.1 Java 版"
 version: "2.1"
 
 # Java 模组要求 >= 154（见官方 Mods.java: meta.getMinMajor() >= minJavaModGameVersion）
-minGameVersion: 158
+# 目标版本 = 本机实测的游戏版本 Mindustry v8 Build 160.5
+#（MindustryX 客户端版本串 8-official-2026.09.20.B498，与上游 v160.5 发布日 2026-09-20 一致）
+minGameVersion: 160.5
 
 # 声明这是 Java 模组
 java: true

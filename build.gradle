@@ -10,8 +10,8 @@ ext{
     // 目标 Mindustry 版本。可用值：
     //   latest   -> 最新正式版
     //   be       -> 最新提交（BE 构建）
-    //   v<数字>  -> 指定版本（本项目用 v158）
-    mindustryVersion = "v158"
+    //   v<数字>  -> 指定版本（本项目用 v160.5）
+    mindustryVersion = "v160.5"
     isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
     sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
 }
@@ -20,7 +20,7 @@ repositories{
     mavenCentral()
 
     // 从 Mindustry 的 GitHub Release 直接取 dependencies.jar（Anuken 官方模板的做法，
-    // 不依赖 Maven 仓库，实测最稳）。v158 的 dependencies.jar 约 11.6MB，确实存在。
+    // 不依赖 Maven 仓库，实测最稳）。v160.5 的 dependencies.jar 约 15.4MB，确实存在。
     ivy{
         url = 'https://github.com/'
         patternLayout{ artifact(

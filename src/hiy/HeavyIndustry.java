@@ -48,12 +48,15 @@ public class HeavyIndustry extends Mod{
      */
     @Override
     public void loadContent(){
-        Log.info("[重工业/Java] loadContent() —— 当前未接管任何内容，仍由 JSON/JS 提供");
+        Log.info("[重工业/Java] loadContent() —— 注册内容");
 
-        // 将来启用（示例）：
-        // HIBlocks.load();
-        // HIUnits.load();
-        // HIStatusEffects.load();
+        // 顺序有依赖，不要随意调换：
+        //   HIStatus / HIEffects 先建对象，
+        //   HIBullets 引用它们，HIUnits 再引用弹种与状态并注册实体。
+        HIStatus.load();
+        HIEffects.load();
+        HIBullets.load();
+        HIUnits.load();
     }
 
     /** 是否无头服务端。绘制 / UI 相关代码必须先判断，否则服务端会崩。 */
