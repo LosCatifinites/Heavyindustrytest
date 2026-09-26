@@ -3,8 +3,8 @@ package hiy;
 import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
-import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
+import arc.math.Angles;
 import arc.math.Mathf;
 import arc.util.Time;
 import arc.util.Tmp;
@@ -19,18 +19,15 @@ import mindustry.type.StatusEffect;
 /**
  * 单位用的「黑洞 / 能量吸引」能力。
  *
- * 复刻自两处：
- *   1) EU（ExtraUtilities）scripts/block/turret/sucker.js —— 牵引逻辑
- *      unit.impulseNet( (this - unit).limit(force + (1 - dst/range) * scaledForce) * edelta );
- *   2) DeepSpace ice/entities/bullet/BlockHoleBulletType.kt —— 距离衰减 + 百分比持续伤害
- *      dst  = 1 - u.dst(b) / range
- *      dmg  = (u.type.health * percent + damages) * dst / 60   （每帧）
- *   3) 视觉扭曲走 {@link HIBlackHoles}（TearingSpace 整屏着色器）
+ * 吸引力来源：
+ *   - EU（ExtraUtilities）scripts/block/turret/sucker.js —— 牵引逻辑
+ *   - DeepSpace ice/entities/bullet/BlockHoleBulletType.kt —— 距离衰减 + 百分比持续伤害
  *
- * 与两者的差别（本实现的取舍）：
- *   - 原作 sucker 是「炮塔牵引」：目标是建筑；这里改成「单位自身排开引力场」，跟着单位跑。
- *   - 原作用 impulse（力 / 质量），巨型单位几乎拉不动；这里默认直接用速度累加（引力场对
- *     所有单位效果一致），并单独提供 maxPullSpeed 限速。想恢复质量影响把 useImpulse 设 true。
+ * 视觉：**纯矢量绘制的外环拉伸**（不吞掉本体、不使用像素扭曲着色器）。
+ *   - 外环半径默认 = outRadius（贴到最外圈）
+ *   - 环上若干条放射状「拉伸线」，长度随时间脉动 → 拉伸感
+ *   - 环本身按 ellipse 变成椭圆并脉动
+ *   若仍想要 EU 那种整屏像素扭曲，把 {@link #shader} 设 true（会调用 {@link HIBlackHoles}）。
  *
  * 挂到单位上（示例见 HIUnits）：
  *   unitType.abilities.add(new HIBlackHoleAbility(220f, 200f));
@@ -48,7 +45,7 @@ public class HIBlackHoleAbility extends Ability{
     public float maxPullSpeed = 6f;
     /** true = 走 impulse（力/质量，巨型单位更抗拉）。 */
     public boolean useImpulse = false;
-    /** useImpulse = true 时的「力」大小（参照 EU sucker：24 / NH：force + scaledForce）。 */
+    /** useImpulse = true 时的「力」大小。 */
     public float force = 400f;
 
     // ---------- 伤害 / 状态 ----------
@@ -58,22 +55,38 @@ public class HIBlackHoleAbility extends Ability{
     public float healthPercentPerSecond = 0.05f;
     /** 施加的状态；null 表示不施加。 */
     public StatusEffect status = StatusEffects.sapped;
-    /** 状态刷新时长（秒）。每 statusInterval 帧刷一次，所以给个小值即可。 */
+    /** 状态刷新时长（秒）。 */
     public float statusDuration = 1.2f;
     /** 状态 / 伤害的结算间隔（帧）。 */
     public float statusInterval = 10f;
 
-    // ---------- 视觉 ----------
-    /** 是否登记到整屏扭曲着色器。 */
-    public boolean shader = true;
-    /** 着色器内半径（黑洞「视界」大小）。 */
-    public float inRadius = 28f;
-    /** 着色器外半径（扭曲影响范围）。 */
-    public float outRadius = 200f;
-    /** 是否在本体位置画叠加光环（无贴图，纯矢量）。 */
+    // ---------- 视觉：外环拉伸 ----------
+    /** 是否画外环拉伸。 */
     public boolean drawRing = true;
-    public Color coreColor = Color.valueOf("665c9f");
+    /** 外环半径；<= 0 时自动取 outRadius。 */
+    public float ringRadius = 0f;
+    /** 环上放射状拉伸线的数量。 */
+    public int stretchCount = 28;
+    /** 每条拉伸线的基准长度（像素）。 */
+    public float stretchLength = 34f;
+    /** 拉伸脉动幅度（0~1，越大长短差异越明显）。 */
+    public float stretchPulse = 0.5f;
+    /** 外环椭圆拉伸量（0 = 正圆，0.14 = 明显椭圆）。 */
+    public float ellipse = 0.14f;
+    /** 外环整体旋转速度（度/帧）。 */
+    public float ringSpin = 0.3f;
+    /** 外环线宽。 */
+    public float ringStroke = 2f;
+    /** 环 / 拉伸线颜色。 */
     public Color edgeColor = Color.valueOf("be92f9");
+
+    // ---------- 视觉：可选的整屏像素扭曲（默认关闭） ----------
+    /** true 才会登记到 TearingSpace 整屏扭曲着色器（会扭曲地形像素，默认不用）。 */
+    public boolean shader = false;
+    /** 着色器内半径（仅 shader = true 时有意义）。 */
+    public float inRadius = 28f;
+    /** 着色器外半径（仅 shader = true 时有意义）。 */
+    public float outRadius = 200f;
 
     /** 每实例的结算计时（Ability 会按单位 copy 一份）。 */
     protected float timer = 0f;
@@ -84,6 +97,7 @@ public class HIBlackHoleAbility extends Ability{
     public HIBlackHoleAbility(float range, float outRadius){
         this.range = range;
         this.outRadius = outRadius;
+        this.ringRadius = outRadius;
     }
 
     @Override
@@ -133,22 +147,46 @@ public class HIBlackHoleAbility extends Ability{
     public void draw(Unit unit){
         if(Vars.headless || !drawRing) return;
 
-        float pulse = Mathf.absin(Time.time * 0.06f, 1f, 0.12f);
+        float rad = ringRadius > 0f ? ringRadius : outRadius;
+        if(rad <= 0f) return;
 
-        Draw.z(Layer.effect);
+        float t = Time.time;
+        float spin = t * ringSpin;
+        float pulse = Mathf.absin(t * 0.05f, 1f, 1f);      // -1 .. 1
+
+        // 椭圆拉伸：两个轴反向脉动，环会周期性被"拉长"
+        float ex = 1f + ellipse * pulse;
+        float ey = 1f - ellipse * pulse;
+
+        Draw.z(Layer.effect + 0.5f);
         Draw.blend(Blending.additive);
 
-        Draw.color(coreColor);
-        Draw.alpha(0.55f);
-        Fill.circle(unit.x, unit.y, inRadius * (0.85f + pulse));
-
+        // ① 外环（椭圆，贴在最小圈之外）
         Draw.color(edgeColor);
-        Draw.alpha(0.28f);
-        Fill.circle(unit.x, unit.y, inRadius * 1.6f * (0.9f + pulse));
+        Draw.alpha(0.5f + 0.2f * Math.abs(pulse));
+        Lines.stroke(ringStroke + pulse * 0.8f);
 
-        Lines.stroke(2f + pulse * 2f);
-        Draw.alpha(0.35f);
-        Lines.circle(unit.x, unit.y, outRadius * 0.55f);
+        int seg = 48;
+        Lines.beginLine();
+        for(int i = 0; i <= seg; i++){
+            float a = i * 360f / seg;
+            Lines.linePoint(unit.x + Angles.trnsx(a, rad * ex), unit.y + Angles.trnsy(a, rad * ey));
+        }
+        Lines.endLine();
+
+        // ② 放射状"拉伸线"：从外环向外拖出，长度脉动
+        for(int i = 0; i < stretchCount; i++){
+            float a = spin + i * 360f / stretchCount;
+            float k = Mathf.absin(t * 0.07f + i * 3.7f, 1f, 1f);          // -1 .. 1
+            float len = stretchLength * (1f - stretchPulse * 0.5f + stretchPulse * k);
+
+            float sx = unit.x + Angles.trnsx(a, rad * ex);
+            float sy = unit.y + Angles.trnsy(a, rad * ey);
+
+            Draw.alpha(0.35f + 0.4f * Math.abs(k));
+            Lines.stroke(2.2f);
+            Lines.lineAngle(sx, sy, a, len);
+        }
 
         Draw.blend();
         Draw.reset();

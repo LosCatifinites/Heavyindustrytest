@@ -74,15 +74,19 @@ public class HIUnits{
         clusterLobes.abilities.add(new ClusterLobesBarAbility());
 
         // ---------- 黑洞 / 能量吸引（演示；不想要就删掉下面这段） ----------
-        // 移植自 EU sucker.js（牵引）+ DeepSpace BlockHoleBulletType（距离衰减/百分比伤害）
-        // + EU TearingSpace.frag（整屏空间扭曲）。
-        HIBlackHoleAbility blackHole = new HIBlackHoleAbility(8f * 28f, 8f * 26f);
+        // 移植自 EU sucker.js（牵引）+ DeepSpace BlockHoleBulletType（距离衰减/百分比伤害）。
+        // 视觉是纯矢量的「外环拉伸」，不吞本体、不扭曲像素。
+        // 想启用 EU 那种整屏像素扭曲：blackHole.shader = true;（会用到 HIBlackHoles + TearingSpace.frag）
+        HIBlackHoleAbility blackHole = new HIBlackHoleAbility(8f * 28f, 8f * 27f);
         blackHole.pullAccel = 0.10f;
         blackHole.pullBonus = 0.22f;
         blackHole.maxPullSpeed = 4.5f;
         blackHole.healthPercentPerSecond = 0.03f;
         blackHole.status = HIStatus.electromagneticPulse;
-        blackHole.inRadius = 34f;
+        blackHole.stretchCount = 32;        // 外环上拉伸线的数量
+        blackHole.stretchLength = 40f;      // 拉伸线长度
+        blackHole.ellipse = 0.16f;          // 外环被拉成椭圆的程度
+        blackHole.edgeColor = HIColors.b4;
         clusterLobes.abilities.add(blackHole);
     }
 
