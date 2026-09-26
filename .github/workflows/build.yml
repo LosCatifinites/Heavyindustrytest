@@ -57,6 +57,8 @@ jobs:
           find src -name '*.java' > srcs.txt
           echo "--- 待编译源文件 ---"
           cat srcs.txt
+          # ⚠ --release 8：源码里不能用 Java 9+ 语法（var / record / 文本块）与
+          #   Java 16+ 的 instanceof 模式匹配，也不能用 Java 9+ 新 API。
           javac -encoding UTF-8 --release 8 -nowarn \
                 -cp mindustry-core.jar:arc-core.jar \
                 -d out/classes @srcs.txt

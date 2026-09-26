@@ -20,10 +20,10 @@ import mindustry.type.Weapon;
 public class HIUnits{
 
     /** 工蜂：装配母舰生成的小型维修单位（暂无专属贴图，兜底用原版 flare）。 */
-    public static UnitType welder;
+    public static HIUnitType welder;
 
     /** 裂片集群：重工业的主力单位，整合了锻炉/镜盾/修复场/母舰/电磁五套机制。 */
-    public static UnitType clusterLobes;
+    public static HIUnitType clusterLobes;
 
     public static void load(){
         loadWelder();

@@ -15,7 +15,7 @@ import mindustry.ui.Bar;
  * 「锻炉」：拦截敌方子弹 → 储存为蓄能 → 转化成减伤与反打伤害。
  *
  * 拦截思路来自 DeepSpace 的 {@code universecore.world.ability.InterceptAbilty}
- * （用 {@code Groups.bullet.intersect} 扫范围敌弹），
+ * （用 Groups.bullet.intersect 扫范围敌弹），
  * 「蓄能」这一层是重工业自己的设计：把拦下来的伤害变成一个可被武器消费的资源。
  *
  * 闭环：
@@ -48,7 +48,9 @@ public class HIInterceptAbility extends Ability{
 
     @Override
     public void update(Unit unit){
-        if(!(unit instanceof HIUnitEntity e)) return;
+        // --release 8：不能用 instanceof 模式匹配
+        if(!(unit instanceof HIUnitEntity)) return;
+        final HIUnitEntity e = (HIUnitEntity)unit;
 
         if(e.forgeCharge > 0f){
             e.forgeCharge = Mathf.clamp(e.forgeCharge - decayPerSecond / 60f * Time.delta, 0f, 1f);
@@ -75,7 +77,8 @@ public class HIInterceptAbility extends Ability{
 
     @Override
     public void displayBars(Unit unit, Table bars){
-        if(!(unit instanceof HIUnitEntity e)) return;
+        if(!(unit instanceof HIUnitEntity)) return;
+        final HIUnitEntity e = (HIUnitEntity)unit;
         bars.add(new Bar("锻炉蓄能", color, () -> Mathf.clamp(e.forgeCharge))).row();
     }
 

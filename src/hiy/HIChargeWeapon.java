@@ -30,18 +30,21 @@ public class HIChargeWeapon extends Weapon{
 
     @Override
     public void update(Unit unit, WeaponMount mount){
-        if(unit instanceof HIUnitEntity e){
-            mount.reloadMultiplier = 1f + reloadBoost * e.forgeCharge;
+        // --release 8：不能用 instanceof 模式匹配
+        if(unit instanceof HIUnitEntity){
+            mount.reloadMultiplier = 1f + reloadBoost * ((HIUnitEntity)unit).forgeCharge;
         }
         super.update(unit, mount);
     }
 
     @Override
     protected void shoot(Unit unit, WeaponMount mount, float shootX, float shootY, float rotation){
-        if(!(unit instanceof HIUnitEntity e) || bullet == null){
+        if(!(unit instanceof HIUnitEntity) || bullet == null){
             super.shoot(unit, mount, shootX, shootY, rotation);
             return;
         }
+
+        HIUnitEntity e = (HIUnitEntity)unit;
 
         float old = bullet.damage;
         bullet.damage = old * (1f + damageBoost * e.forgeCharge);

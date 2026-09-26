@@ -39,7 +39,7 @@ public class HIRepairFieldAbility extends Ability{
         final float pct = percentAmount;
 
         Units.nearbyBuildings(unit.x, unit.y, range, b -> {
-            if(b.team != unit.team || b.damage <= 0f) return;
+            if(b.team != unit.team || b.health >= b.maxHealth) return;
             b.heal(base + b.maxHealth * pct);
         });
 

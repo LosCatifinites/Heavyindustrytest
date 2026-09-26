@@ -10,16 +10,16 @@ import mindustry.gen.Unit;
 import mindustry.ui.Bar;
 
 /**
- * 「电磁封锁者」：给单位加一条**独立的电磁完整性**（第二血条）。
+ * 「电磁封锁者」：给单位加一条独立的电磁完整性（第二血条）。
  *
- * 复刻自 DeepSpace 的 {@code singularity.world.unit.EMPHealthManager}（279 行）的**机制**，
- * 但去掉了它的 JSON 声明层（那套依赖 {@code Mods} 的解析钩子，重工业用 Java 字段更直接）：
- *   - 上限 = 单位最大生命 * {@link #empFraction}（首次 update 时初始化）
- *   - 归零后进入**瘫痪**：持续刷 {@code disarmed}（不能开火）+ {@code unmoving}（不能移动）
- *   - 未归零时按 {@link #empRepairPerSecond} 自修复
+ * 复刻自 DeepSpace 的 {@code singularity.world.unit.EMPHealthManager}（279 行）的机制，
+ * 但去掉了它的 JSON 声明层（那套依赖 Mods 的解析钩子，重工业用 Java 字段更直接）：
+ *   - 上限 = 单位最大生命 * empFraction（首次 update 时初始化）
+ *   - 归零后进入瘫痪：持续刷 disarmed（不能开火）+ unmoving（不能移动）
+ *   - 未归零时按 empRepairPerSecond 自修复
  *
- * 数据存在 {@link HIUnitEntity} 上，因此随存档保存。
- * 电磁伤害来源见 {@link HIEmpBulletType}。
+ * 数据存在 HIUnitEntity 上，因此随存档保存。
+ * 电磁伤害来源见 HIEmpBulletType。
  */
 public class HIEmpAbility extends Ability{
 
@@ -36,7 +36,9 @@ public class HIEmpAbility extends Ability{
 
     @Override
     public void update(Unit unit){
-        if(!(unit instanceof HIUnitEntity e)) return;
+        // --release 8：不能用 instanceof 模式匹配
+        if(!(unit instanceof HIUnitEntity)) return;
+        HIUnitEntity e = (HIUnitEntity)unit;
 
         if(e.empMax <= 0f){
             e.empMax = unit.type.health * empFraction;
@@ -53,8 +55,12 @@ public class HIEmpAbility extends Ability{
 
     @Override
     public void displayBars(Unit unit, Table bars){
-        if(!(unit instanceof HIUnitEntity e) || e.empMax <= 0f) return;
-        bars.add(new Bar("电磁完整性", color, () -> Mathf.clamp(e.empHealth / e.empMax))).row();
+        if(!(unit instanceof HIUnitEntity)) return;
+        HIUnitEntity e = (HIUnitEntity)unit;
+        if(e.empMax <= 0f) return;
+
+        final HIUnitEntity ref = e;
+        bars.add(new Bar("电磁完整性", color, () -> Mathf.clamp(ref.empHealth / ref.empMax))).row();
     }
 
     @Override

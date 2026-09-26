@@ -5,7 +5,7 @@ import mindustry.gen.Bullet;
 import mindustry.gen.Hitboxc;
 
 /**
- * 打「电磁完整性」的子弹：命中带 {@link HIUnitEntity} 的单位时额外扣 EMP。
+ * 打「电磁完整性」的子弹：命中带 HIUnitEntity 的单位时额外扣 EMP。
  * 普通伤害照常结算（走 super）。
  */
 public class HIEmpBulletType extends BasicBulletType{
@@ -24,8 +24,10 @@ public class HIEmpBulletType extends BasicBulletType{
     @Override
     public void hitEntity(Bullet b, Hitboxc entity, float health){
         super.hitEntity(b, entity, health);
-        if(entity instanceof HIUnitEntity e){
-            e.damageEmp(empDamage);
+
+        // --release 8：不能用 instanceof 模式匹配
+        if(entity instanceof HIUnitEntity){
+            ((HIUnitEntity)entity).damageEmp(empDamage);
         }
     }
 }
