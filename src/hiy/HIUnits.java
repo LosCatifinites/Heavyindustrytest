@@ -72,6 +72,18 @@ public class HIUnits{
 
         // ---------- 信息面板附加条 ----------
         clusterLobes.abilities.add(new ClusterLobesBarAbility());
+
+        // ---------- 黑洞 / 能量吸引（演示；不想要就删掉下面这段） ----------
+        // 移植自 EU sucker.js（牵引）+ DeepSpace BlockHoleBulletType（距离衰减/百分比伤害）
+        // + EU TearingSpace.frag（整屏空间扭曲）。
+        HIBlackHoleAbility blackHole = new HIBlackHoleAbility(8f * 28f, 8f * 26f);
+        blackHole.pullAccel = 0.10f;
+        blackHole.pullBonus = 0.22f;
+        blackHole.maxPullSpeed = 4.5f;
+        blackHole.healthPercentPerSecond = 0.03f;
+        blackHole.status = HIStatus.electromagneticPulse;
+        blackHole.inRadius = 34f;
+        clusterLobes.abilities.add(blackHole);
     }
 
     private static Weapon weapon(float baseRotation){

@@ -53,6 +53,7 @@ public class HeavyIndustry extends Mod{
         // 顺序有依赖，不要随意调换：
         //   HIStatus / HIEffects 先建对象，
         //   HIBullets 引用它们，HIUnits 再引用弹种与状态并注册实体。
+        HIBlackHoles.load();
         HIStatus.load();
         HIEffects.load();
         HIBullets.load();
