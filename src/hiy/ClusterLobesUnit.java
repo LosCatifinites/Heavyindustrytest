@@ -36,10 +36,7 @@ import mindustry.graphics.Trail;
  *   3. 每 60 帧朝圈上每个顶点发射环状激光
  *   4. 对 80 距离内的敌人持续施加「电磁脉冲」
  */
-public class ClusterLobesUnit extends UnitEntity{
-
-    /** EntityMapping.register 返回的 id，classId() 靠它做存档 / 联机同步。 */
-    public static int registeredId = -1;
+public class ClusterLobesUnit extends HIUnitEntity{
 
     /** resistCont 每积累这么多，护甲 +1。 */
     public static final float armorCont = 50f;
@@ -98,11 +95,6 @@ public class ClusterLobesUnit extends UnitEntity{
     @Override
     public boolean isFlying(){
         return true;
-    }
-
-    @Override
-    public int classId(){
-        return registeredId;
     }
 
     /** 由 resistCont 换算的伤害减免，上限 30%。 */
