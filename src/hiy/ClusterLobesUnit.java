@@ -78,7 +78,7 @@ public class ClusterLobesUnit extends HIUnitEntity{
     public final Vec2[] outsideRing = new Vec2[ringPoints];
 
     /** 外圈半径。 */
-    public final float rs = 80f;
+    public final float rs = 300f;
     /** 内圈半径。 */
     public final float r = 0.5f * 80f;
 
