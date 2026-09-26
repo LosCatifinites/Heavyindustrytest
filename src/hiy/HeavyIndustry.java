@@ -57,6 +57,7 @@ public class HeavyIndustry extends Mod{
         HIStatus.load();
         HIEffects.load();
         HIBullets.load();
+        HIExtraBullets.load();
         HIUnits.load();
     }
 

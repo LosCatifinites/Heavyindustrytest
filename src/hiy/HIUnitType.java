@@ -2,19 +2,24 @@ package hiy;
 
 import arc.Core;
 import arc.func.Prov;
+import arc.graphics.Color;
 import arc.util.Log;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
 import mindustry.gen.Unit;
+import mindustry.type.ItemStack;
 import mindustry.type.UnitType;
+import mindustry.type.Weapon;
 
 /**
  * 重工业单位内容基类。
  *
- * 复刻自 DeepSpace 的 {@code SglUnitType}（仅 27 行，是整个单位框架里最值得抄的一段）：
- *   - 一行完成「实体注册 + UnitType 构造器绑定」
- *   - 提供 {@link #initUnit}/{@link #readUnit}/{@link #writeUnit} 三个钩子，
- *     这样单位自己的存档字段不必在每个实体类里手写
+ * 由两部分合并而来：
+ *   1. DeepSpace 的 {@code SglUnitType}（27 行）：实体注册 + init/read/write 钩子
+ *   2. NewHorizon 的 {@code NHUnitType}：
+ *      - 统一描边色 / 描边宽度
+ *      - {@link #init()} 里按「最远武器射程」自动算 {@code fogRadius}
+ *      - 工厂造价用的 {@link #setRequirements}
  *
  * 用法：
  * <pre>
@@ -24,6 +29,9 @@ import mindustry.type.UnitType;
  * </pre>
  */
 public class HIUnitType extends UnitType{
+
+    /** 默认描边色（NH 的 grayOutline）。 */
+    public static final Color defaultOutline = Color.valueOf("2e3039");
 
     /** EntityMapping 分配到的 id，由 {@link HIUnitEntity#classId()} 返回。 */
     public int entityId = -1;
@@ -43,8 +51,29 @@ public class HIUnitType extends UnitType{
 
     public HIUnitType(String contentName){
         super(contentName);
-        // UnitType 构造器已经执行过 constructor = EntityMapping.map(this.name)；
-        // 走 create() 的话这里一定命中，没命中说明有人直接 new 了本类。
+
+        // ---- 模块：统一描边（NHUnitType 同款）----
+        outlineColor = defaultOutline;
+        outlineRadius = 3;
+    }
+
+    /** 模块：按最远武器射程自动设置战争迷雾半径（NewHorizon 的做法）。 */
+    @Override
+    public void init(){
+        super.init();
+
+        float maxWeaponRange = 0f;
+        for(Weapon weapon : weapons){
+            if(weapon.range() > maxWeaponRange) maxWeaponRange = weapon.range();
+        }
+        // 覆盖掉 gameplay 里对 fogRadius 的手动赋值；想自定义请在子类 init() 里再改
+        fogRadius = maxWeaponRange / 8f;
+    }
+
+    /** 模块：工厂造价（NHUnitType 同款）。 */
+    public void setRequirements(ItemStack[] stacks){
+        cachedRequirements = stacks;
+        totalRequirements = firstRequirements = ItemStack.mult(stacks, 1f / 15f);
     }
 
     /** 单位被创建（add）后调用。 */

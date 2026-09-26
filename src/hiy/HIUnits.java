@@ -2,27 +2,40 @@ package hiy;
 
 import arc.struct.Seq;
 import mindustry.Vars;
+import mindustry.content.Fx;
+import mindustry.content.StatusEffects;
+import mindustry.entities.abilities.ShieldRegenFieldAbility;
+import mindustry.entities.bullet.BulletType;
 import mindustry.entities.part.HaloPart;
-import mindustry.entities.pattern.ShootBarrel;
+import mindustry.entities.pattern.ShootMulti;
+import mindustry.entities.pattern.ShootPattern;
+import mindustry.type.ItemStack;
 import mindustry.type.StatusEffect;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
+import mindustry.type.weapons.PointDefenseWeapon;
 
 /**
- * 单位内容注册。
+ * 单位内容注册（模块化版本）。
  *
- * 现在走的是重工业自己的单位框架（{@link HIUnitType} / {@link HIUnitEntity} / {@link HIEntities}），
- * 所以每个单位只需要一行 {@code HIUnitType.create(...)} 就完成「实体注册 + 构造器绑定」，
- * 单位自己的存档字段走 {@code initUnit/readUnit/writeUnit} 钩子。
+ * 每个单位的所有能力都按「模块」排列，模块之间互不依赖，可以整块注释掉：
  *
- * 注册顺序：<b>被生成的单位必须先建</b>（母舰的 HIUnitSpawnAbility 直接引用 welder）。
+ *   【框架模块】  实体绑定 / 描边 / 雾半径           → HIUnitType
+ *   【基础模块】  数值 / 体型 / 形态
+ *   【移动模块】  引擎 / 尾迹 / 光照
+ *   【功能模块】  载运 / 采矿 / 物品容量
+ *   【武器模块】  蓄力主炮 / 点防御 / 轨道炮 / 曳光弹 / 空中爆点
+ *   【能力模块】  锻炉 / 镜盾 / 修复场 / 光环场 / 护盾再生场 / 电磁 / 母舰孵化 / 死亡爆发
+ *   【视觉模块】  光环部件 / 黑洞外环
+ *
+ * 注册顺序：被生成的单位必须先建（母舰的孵化能力直接引用 welder）。
  */
 public class HIUnits{
 
-    /** 工蜂：装配母舰生成的小型维修单位（暂无专属贴图，兜底用原版 flare）。 */
+    /** 工蜂：装配母舰生成的小型采矿/维修单位（暂无专属贴图，兜底用原版 flare）。 */
     public static HIUnitType welder;
 
-    /** 裂片集群：重工业的主力单位，整合了锻炉/镜盾/修复场/母舰/电磁五套机制。 */
+    /** 裂片集群：重工业的主力旗舰。 */
     public static HIUnitType clusterLobes;
 
     public static void load(){
@@ -31,12 +44,13 @@ public class HIUnits{
     }
 
     // ==================================================================
-    //  工蜂
+    //  工蜂（模块：移动 / 采矿 / 光照 / 修复）
     // ==================================================================
     private static void loadWelder(){
         welder = HIUnitType.create("welder", HIUnitEntity::new);
-        welder.fallbackRegion = "flare";      // 贴图缺失时兜底（UnitType.load 之后生效）
+        welder.fallbackRegion = "flare";
 
+        // ---- 基础模块 ----
         welder.health = 900f;
         welder.armor = 2f;
         welder.hitSize = 10f;
@@ -47,9 +61,26 @@ public class HIUnits{
         welder.flying = true;
         welder.lowAltitude = true;
         welder.engineSize = 0f;
-        welder.itemCapacity = 0;
-        welder.hidden = false;
+        welder.itemCapacity = 20;
 
+        // ---- 移动模块：引擎 ----
+        welder.engines.add(new UnitType.UnitEngine(0f, -4.5f, 2.2f, -90f));
+
+        // ---- 移动模块：尾迹 ----
+        welder.trailLength = 10;
+        welder.trailScl = 1.4f;
+
+        // ---- 光照模块 ----
+        welder.lightRadius = 60f;
+        welder.lightOpacity = 0.12f;
+
+        // ---- 功能模块：采矿 ----
+        welder.mineWalls = true;
+        welder.mineFloor = true;
+        welder.mineTier = 2;
+        welder.mineSpeed = 3f;
+
+        // ---- 能力模块：修复场 ----
         HIRepairFieldAbility repair = new HIRepairFieldAbility();
         repair.range = 95f;
         repair.amount = 26f;
@@ -63,7 +94,7 @@ public class HIUnits{
     private static void loadClusterLobes(){
         clusterLobes = HIUnitType.create("clusterLobes", ClusterLobesUnit::new);
 
-        // ---------- 基础数值 ----------
+        // ---------------- 基础模块 ----------------
         clusterLobes.health = 96000f;
         clusterLobes.armor = 0f;
         clusterLobes.hitSize = 32f;
@@ -72,9 +103,10 @@ public class HIUnits{
         clusterLobes.drag = 0.05f;
         clusterLobes.range = 8f * 60f;
         clusterLobes.engineSize = 0f;
-        clusterLobes.itemCapacity = 0;
+        clusterLobes.itemCapacity = 120;
+        clusterLobes.outlineRadius = 5;          // 模块：加粗描边（NH 同款）
 
-        // ---------- 形态 ----------
+        // ---------------- 形态模块 ----------------
         clusterLobes.flying = true;
         clusterLobes.lowAltitude = true;
         clusterLobes.faceTarget = false;
@@ -82,18 +114,32 @@ public class HIUnits{
         clusterLobes.drawCell = false;
         clusterLobes.hidden = false;
 
-        // ---------- 免疫一切削弱移动速度的状态 ----------
+        // ---------------- 光照模块 ----------------
+        clusterLobes.lightRadius = 120f;
+        clusterLobes.lightOpacity = 0.10f;
+
+        // ---------------- 功能模块：载运 ----------------
+        clusterLobes.payloadCapacity = 2f * Vars.tilePayload;
+
+        // ---------------- 免疫模块 ----------------
         Seq<StatusEffect> all = Vars.content.statusEffects();
         for(StatusEffect s : all){
             if(s.speedMultiplier == 1f) continue;
             clusterLobes.immunities.add(s);
         }
 
-        // ---------- 上下两门主武器（原 baseRotation 90 / 270）----------
-        clusterLobes.weapons.add(weapon(90f));
-        clusterLobes.weapons.add(weapon(270f));
+        // ================= 武器模块 =================
+        // ① 蓄力主炮 ×2（上下），组合射击模式 ShootMulti（NH 幽影同款）
+        clusterLobes.weapons.add(chargeWeapon(90f));
+        clusterLobes.weapons.add(chargeWeapon(270f));
 
-        // ---------- 光环部件 ----------
+        // ② 点防御武器（官方 mindustry.type.weapons.PointDefenseWeapon）
+        clusterLobes.weapons.add(pointDefense());
+
+        // ③ 轨道主炮（RailBulletType，EU 湮灭同款）
+        clusterLobes.weapons.add(railWeapon());
+
+        // ================= 视觉模块 =================
         HaloPart halo = new HaloPart();
         halo.mirror = false;
         halo.shapes = 4;
@@ -103,12 +149,11 @@ public class HIUnits{
         halo.haloRotateSpeed = -1f;
         clusterLobes.parts.add(halo);
 
-        // ==============================================================
-        //  机制整合（1 锻炉 / 2 母舰 / 3 镜盾 / 6 电磁）
-        //  整段删掉即可回到「纯裂片集群」状态。
-        // ==============================================================
+        // ================= 能力模块 =================
+        // 战况信息条
+        clusterLobes.abilities.add(new ClusterLobesBarAbility());
 
-        // ① 锻炉：拦弹 → 蓄能 →（减伤 + 反打）
+        // ① 锻炉：拦弹 → 蓄能 → 减伤 / 反打
         HIInterceptAbility forge = new HIInterceptAbility();
         forge.range = 175f;
         forge.chargePerDamage = 0.0022f;
@@ -117,7 +162,7 @@ public class HIUnits{
         forge.absorbEffect = HIEffects.polyHit;
         clusterLobes.abilities.add(forge);
 
-        // ③ 镜盾：正面多边形镜面，按角度反射子弹
+        // ② 镜盾：按角度反射
         HIMirrorShieldAbility mirror = new HIMirrorShieldAbility();
         mirror.sides = 6;
         mirror.radius = 62f;
@@ -128,29 +173,50 @@ public class HIUnits{
         mirror.spin = 0.35f;
         clusterLobes.abilities.add(mirror);
 
-        // ② 母舰：修复场 + 周期生成工蜂
+        // ③ 修复场（EU「神谕/海幻」同款思路）
         HIRepairFieldAbility repair = new HIRepairFieldAbility();
         repair.range = 150f;
         repair.amount = 55f;
         repair.reload = 30f;
         clusterLobes.abilities.add(repair);
 
-        HIUnitSpawnAbility spawn = new HIUnitSpawnAbility(welder, 60f * 14f);
-        spawn.amount = 1;
-        spawn.limit = 4;
-        spawn.spread = 26f;
-        clusterLobes.abilities.add(spawn);
+        // ④ 光环场（EU「冥域」：增强己方 / 削弱敌方）
+        HIAuraFieldAbility aura = new HIAuraFieldAbility();
+        aura.range = 230f;
+        aura.reload = 30f;
+        aura.allyHealPercent = 0.02f;
+        aura.allyStatus = StatusEffects.overdrive;
+        aura.allyStatusDuration = 2f;
+        aura.enemyStatus = HIStatus.electromagneticPulse;
+        aura.enemyStatusDuration = 2f;
+        aura.enemyDamage = 0f;
+        aura.color = HIColors.b4;
+        clusterLobes.abilities.add(aura);
 
-        // ⑥ 电磁：第二血条，打空即瘫痪
+        // ⑤ 护盾再生场（官方 ShieldRegenFieldAbility，EU「湮灭」同款）
+        clusterLobes.abilities.add(new ShieldRegenFieldAbility(100f, 600f, 60f * 6f, 200f));
+
+        // ⑥ 电磁第二血条
         HIEmpAbility emp = new HIEmpAbility();
         emp.empFraction = 0.3f;
         emp.empRepairPerSecond = 0.015f;
         clusterLobes.abilities.add(emp);
 
-        // ---------- 信息面板附加条（原：格挡数量 / 护甲 / 伤害减免）----------
-        clusterLobes.abilities.add(new ClusterLobesBarAbility());
+        // ⑦ 母舰：多点多周期孵化（EU「湮灭」4 个孵化点同款）
+        clusterLobes.abilities.add(spawn(welder, 60f * 14f, 9.5f, 0f, 4f));
+        clusterLobes.abilities.add(spawn(welder, 60f * 14f, -9.5f, 0f, 4f));
+        clusterLobes.abilities.add(spawn(welder, 60f * 22f, 22f, 0f, 3f));
+        clusterLobes.abilities.add(spawn(welder, 60f * 22f, -22f, 0f, 3f));
 
-        // ---------- 黑洞 / 能量吸引（外环拉伸；不想要就删掉下面这段）----------
+        // ⑧ 死亡爆发 + 瘫痪（EU「海幻」同款）
+        HIDeathBlastAbility death = new HIDeathBlastAbility();
+        death.range = 200f;
+        death.damage = 2600f;
+        death.paralyze = 60f * 4f;
+        death.effect = HIEffects.polyHit;
+        clusterLobes.abilities.add(death);
+
+        // ⑨ 黑洞 / 能量吸引（外环拉伸）
         HIBlackHoleAbility blackHole = new HIBlackHoleAbility(8f * 28f, 8f * 27f);
         blackHole.pullAccel = 0.10f;
         blackHole.pullBonus = 0.22f;
@@ -165,15 +231,11 @@ public class HIUnits{
     }
 
     // ==================================================================
-    //  武器
+    //  武器工厂
     // ==================================================================
 
-    /**
-     * 主武器：蓄力炮。
-     * 用 {@link HIChargeWeapon} 而不是普通 Weapon —— 它会把「锻炉蓄能」换成
-     * 伤害倍率与射速倍率，开火时逐发消耗蓄能（①②两个机制因此连成闭环）。
-     */
-    private static Weapon weapon(float baseRotation){
+    /** 蓄力主炮：锻炉蓄能 → 伤害 / 射速；组合射击模式。 */
+    private static Weapon chargeWeapon(float baseRotation){
         HIChargeWeapon w = new HIChargeWeapon("clusterLobes-weapon");
         w.mirror = false;
         w.baseRotation = baseRotation;
@@ -182,17 +244,69 @@ public class HIUnits{
         w.rotate = false;
         w.rotateSpeed = 0f;
         w.reload = 60f * 3f;
-        w.inaccuracy = 60f;
+        w.inaccuracy = 10f;
         w.bullet = HIBullets.clusterBullet;
         w.damageBoost = 2.5f;
         w.reloadBoost = 1.2f;
         w.chargePerShot = 0.28f;
 
-        ShootBarrel barrel = new ShootBarrel();
-        barrel.shots = 4;
-        barrel.shotDelay = 6f;
-        w.shoot = barrel;
+        // 组合射击：先 4 连发（间隔 6 帧），再补 2 连发
+        ShootPattern main = new ShootPattern();
+        main.shots = 4;
+        main.shotDelay = 6f;
+        ShootPattern extra = new ShootPattern();
+        extra.shots = 2;
+        w.shoot = new ShootMulti(main, extra);
         return w;
+    }
+
+    /** 点防御武器：自动打掉靠近的敌方子弹。 */
+    private static Weapon pointDefense(){
+        PointDefenseWeapon w = new PointDefenseWeapon("clusterLobes-point-defense");
+        w.mirror = false;
+        w.x = 0f;
+        w.y = 1f;
+        w.reload = 8f;
+        w.targetInterval = 10f;
+        w.targetSwitchInterval = 14f;
+        w.shootSound = mindustry.gen.Sounds.shootForeshadow;
+        w.bullet = new BulletType(){{
+            shootEffect = Fx.sparkShoot;
+            hitEffect = Fx.pointHit;
+            maxRange = 288f;
+            damage = 45f;
+        }};
+        return w;
+    }
+
+    /** 轨道主炮：高伤穿透，慢速。 */
+    private static Weapon railWeapon(){
+        Weapon w = new Weapon("clusterLobes-rail");
+        w.mirror = false;
+        w.top = false;
+        w.rotate = true;
+        w.rotateSpeed = 2f;
+        w.x = 0f;
+        w.y = 5f;
+        w.shootY = 14f;
+        w.reload = 60f * 2f;
+        w.recoil = 5f;
+        w.shake = 6f;
+        w.ejectEffect = Fx.none;
+        w.shootSound = mindustry.gen.Sounds.shootForeshadow;
+        w.bullet = HIExtraBullets.railBullet;
+        return w;
+    }
+
+    /** 孵化能力工厂。 */
+    private static HIUnitSpawnAbility spawn(UnitType child, float time, float sx, float sy, int limit){
+        HIUnitSpawnAbility a = new HIUnitSpawnAbility(child, time);
+        a.sX = sx;
+        a.sY = sy;
+        a.limit = limit;
+        a.amount = 1;
+        a.spread = 18f;
+        return a;
     }
 
     private HIUnits(){
