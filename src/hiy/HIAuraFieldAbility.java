@@ -1,6 +1,5 @@
 package hiy;
 
-import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Lines;
@@ -11,7 +10,7 @@ import arc.util.Time;
 import mindustry.entities.Units;
 import mindustry.entities.abilities.Ability;
 import mindustry.gen.Unit;
-import mindustry.graphics.Layer;
+import mindustry.graphics.Drawf;
 import mindustry.type.StatusEffect;
 import mindustry.ui.Bar;
 
@@ -25,7 +24,7 @@ import mindustry.ui.Bar;
  *   3. 范围内敌方单位受到固定伤害
  *   4. 范围内敌方单位获得状态（减益）
  *
- * 视觉：本体外围一圈脉动环 + 旋转刻度，纯矢量绘制。
+ * 视觉走 {@link HIGlow}（bloom 捕获区间），圆环 + 旋转刻度 + 光源。
  */
 public class HIAuraFieldAbility extends Ability{
 
@@ -39,6 +38,8 @@ public class HIAuraFieldAbility extends Ability{
     public float allyHealPercent = 0.02f;
     public StatusEffect allyStatus;
     public float allyStatusDuration = 3f;
+    /** 是否也给自己上状态 / 回血（默认 false，避免自我永动）。 */
+    public boolean affectSelf = false;
 
     // ---- 对敌方 ----
     public float enemyDamage = 0f;
@@ -48,7 +49,7 @@ public class HIAuraFieldAbility extends Ability{
     // ---- 视觉 ----
     public boolean drawField = true;
     public Color color = Color.valueOf("7ee0ff");
-    public float stroke = 2f;
+    public float stroke = 2.5f;
     public int ticks = 24;
     public float spin = 0.25f;
 
@@ -65,7 +66,7 @@ public class HIAuraFieldAbility extends Ability{
         timer = 0f;
 
         Units.nearby(unit.team, unit.x, unit.y, range, u -> {
-            if(u == unit) return;
+            if(u == unit && !affectSelf) return;
             float heal = allyHealFlat + u.maxHealth * allyHealPercent * (reload / 60f);
             if(heal > 0f) u.heal(heal);
             if(allyStatus != null) u.apply(allyStatus, allyStatusDuration);
@@ -88,28 +89,29 @@ public class HIAuraFieldAbility extends Ability{
     public void draw(Unit unit){
         if(!drawField) return;
 
-        float pulse = Mathf.absin(Time.time * 0.05f, 1f, 1f);
+        final float ux = unit.x, uy = unit.y;
 
-        Draw.z(Layer.effect + 0.6f);
-        Draw.blend(Blending.additive);
-        Draw.color(color);
-        Draw.alpha(0.16f + 0.08f * Math.abs(pulse));
-        Lines.stroke(stroke + pulse * 0.6f);
-        Lines.circle(unit.x, unit.y, range);
+        HIGlow.draw(() -> {
+            float pulse = Mathf.absin(Time.time * 0.05f, 1f, 1f);
 
-        // 旋转刻度
-        Draw.alpha(0.5f);
-        Lines.stroke(stroke);
-        float rot = Time.time * spin;
-        for(int i = 0; i < ticks; i++){
-            float a = rot + i * 360f / ticks;
-            float inner = range - 8f - pulse * 3f;
-            float outer = range + 6f + pulse * 3f;
-            Lines.lineAngle(unit.x + Angles.trnsx(a, inner), unit.y + Angles.trnsy(a, inner), a, outer - inner);
-        }
+            Draw.color(color);
+            Draw.alpha(0.22f + 0.10f * Math.abs(pulse));
+            Lines.stroke(stroke + pulse * 0.8f);
+            Lines.circle(ux, uy, range);
 
-        Draw.blend();
-        Draw.reset();
+            Draw.alpha(0.65f);
+            Lines.stroke(stroke);
+            float rot = Time.time * spin;
+            for(int i = 0; i < ticks; i++){
+                float a = rot + i * 360f / ticks;
+                float inner = range - 10f - pulse * 3f;
+                float outer = range + 8f + pulse * 3f;
+                Lines.lineAngle(ux + Angles.trnsx(a, inner), uy + Angles.trnsy(a, inner), a, outer - inner);
+            }
+
+            Draw.reset();
+            Drawf.light(ux, uy, range * 1.3f, color, 0.22f + 0.08f * Math.abs(pulse));
+        });
     }
 
     @Override

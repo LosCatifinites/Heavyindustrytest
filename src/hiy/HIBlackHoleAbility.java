@@ -13,6 +13,7 @@ import mindustry.content.StatusEffects;
 import mindustry.entities.Units;
 import mindustry.entities.abilities.Ability;
 import mindustry.gen.Unit;
+import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.type.StatusEffect;
 
@@ -158,8 +159,9 @@ public class HIBlackHoleAbility extends Ability{
         float ex = 1f + ellipse * pulse;
         float ey = 1f - ellipse * pulse;
 
-        Draw.z(Layer.effect + 0.5f);
-        Draw.blend(Blending.additive);
+        final float ux = unit.x, uy = unit.y;
+        HIGlow.draw(() -> {
+            Draw.blend(Blending.additive);
 
         // ① 外环（椭圆，贴在最小圈之外）
         Draw.color(edgeColor);
@@ -170,7 +172,7 @@ public class HIBlackHoleAbility extends Ability{
         Lines.beginLine();
         for(int i = 0; i <= seg; i++){
             float a = i * 360f / seg;
-            Lines.linePoint(unit.x + Angles.trnsx(a, rad * ex), unit.y + Angles.trnsy(a, rad * ey));
+            Lines.linePoint(ux + Angles.trnsx(a, rad * ex), uy + Angles.trnsy(a, rad * ey));
         }
         Lines.endLine();
 
@@ -180,16 +182,18 @@ public class HIBlackHoleAbility extends Ability{
             float k = Mathf.absin(t * 0.07f + i * 3.7f, 1f, 1f);          // -1 .. 1
             float len = stretchLength * (1f - stretchPulse * 0.5f + stretchPulse * k);
 
-            float sx = unit.x + Angles.trnsx(a, rad * ex);
-            float sy = unit.y + Angles.trnsy(a, rad * ey);
+            float sx = ux + Angles.trnsx(a, rad * ex);
+            float sy = uy + Angles.trnsy(a, rad * ey);
 
             Draw.alpha(0.35f + 0.4f * Math.abs(k));
             Lines.stroke(2.2f);
             Lines.lineAngle(sx, sy, a, len);
         }
 
-        Draw.blend();
-        Draw.reset();
+            Draw.blend();
+            Draw.reset();
+            Drawf.light(ux, uy, rad * 1.6f, edgeColor, 0.3f + 0.2f * Math.abs(pulse));
+        });
     }
 
     @Override

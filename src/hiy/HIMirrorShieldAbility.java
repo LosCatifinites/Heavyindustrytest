@@ -5,20 +5,26 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.math.Angles;
+import arc.scene.ui.layout.Table;
 import arc.util.Time;
 import mindustry.entities.abilities.Ability;
 import mindustry.gen.Bullet;
 import mindustry.gen.Groups;
 import mindustry.gen.Unit;
+import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
+import mindustry.ui.Bar;
 
 /**
- * 「镜甲卫」：本体某朝向展开的多边形镜面护盾，把进入范围的敌弹**反射**回去。
+ * 「镜甲卫」：本体某朝向展开的多边形镜面护盾，把进入范围的敌弹反射回去。
  *
- * 复刻自 DeepSpace 的 {@code singularity.world.unit.abilities.MirrorFieldAbility}（187 行）+ 
+ * 复刻自 DeepSpace 的 {@code singularity.world.unit.abilities.MirrorFieldAbility}（187 行）+
  * {@code MirrorArmorAbility}，做了两处简化：
  *   - 不做护盾片移动动画（ShieldShape/ShapeMove），只保留固定多边形 + 自转 + 受击闪烁
  *   - 反射不做按角度的伤害修正，统一按 reflectDamageScl 放大
+ *
+ * 视觉：绘制走 {@link HIGlow}（提交到 Layer.effect，落在 bloom 捕获区间内），
+ * 所以护盾和闪烁都会泛光；另外在盾心加一盏 {@code Drawf.light}。
  *
  * 反射的具体做法（官方没有 Bullet.reflect，必须手写）：
  *   改 team / owner，把速度方向设为「从盾心指向子弹」，并按倍率重设速度大小。
@@ -50,6 +56,8 @@ public class HIMirrorShieldAbility extends Ability{
     /** 关掉就不再反射/绘制（可被 HealthRequire 之类动态控制）。 */
     public boolean active = true;
     public boolean drawShield = true;
+    /** 护盾基础不透明度（之前太淡，这里调高）。 */
+    public float baseAlpha = 0.34f;
     public Color color = HIColors.b4;
 
     protected float timer;
@@ -99,18 +107,34 @@ public class HIMirrorShieldAbility extends Ability{
     public void draw(Unit unit){
         if(!drawShield || !active) return;
 
-        float cx = unit.x + Angles.trnsx(unit.rotation - 90f, x, y);
-        float cy = unit.y + Angles.trnsy(unit.rotation - 90f, x, y);
-        float dir = unit.rotation - 90f + angleOffset + shieldRotation;
+        final float cx = unit.x + Angles.trnsx(unit.rotation - 90f, x, y);
+        final float cy = unit.y + Angles.trnsy(unit.rotation - 90f, x, y);
+        final float dir = unit.rotation - 90f + angleOffset + shieldRotation;
+        final float f = Math.min(flash, 1f);
 
-        Draw.z(Layer.shields);
-        Draw.color(color, Color.white, Math.min(flash, 1f));
-        Draw.alpha(0.18f + 0.4f * flash);
-        Fill.poly(cx, cy, sides, radius, dir);
-        Draw.alpha(0.7f);
-        Lines.stroke(1.6f + 2f * flash);
-        Lines.poly(cx, cy, sides, radius, dir);
-        Draw.reset();
+        HIGlow.draw(() -> {
+            Draw.color(color, Color.white, f);
+            Draw.alpha(baseAlpha + 0.5f * f);
+            Fill.poly(cx, cy, sides, radius, dir);
+
+            Draw.alpha(0.85f);
+            Lines.stroke(2.2f + 3f * f);
+            Lines.poly(cx, cy, sides, radius, dir);
+
+            // 受击瞬间再来一圈外扩环
+            if(f > 0.01f){
+                Lines.stroke(2f * f);
+                Lines.circle(cx, cy, radius * (1f + 0.25f * (1f - f)));
+            }
+
+            Draw.reset();
+            Drawf.light(cx, cy, radius * 1.8f, color, 0.35f + 0.5f * f);
+        });
+    }
+
+    @Override
+    public void displayBars(Unit unit, Table bars){
+        bars.add(new Bar("镜盾", color, () -> 1f - Math.min(flash, 1f))).row();
     }
 
     @Override

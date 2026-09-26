@@ -194,7 +194,9 @@ public class HIUnits{
         clusterLobes.abilities.add(aura);
 
         // ⑤ 护盾再生场（官方 ShieldRegenFieldAbility，EU「湮灭」同款）
-        clusterLobes.abilities.add(new ShieldRegenFieldAbility(100f, 600f, 60f * 6f, 200f));
+        //   注意：护盾环的可见度靠 shieldAlpha，而它每 15 帧就衰减到 0，
+        //   所以 reload 不能太长，否则"看不到护盾"。这里取 2 秒一次。
+        clusterLobes.abilities.add(new ShieldRegenFieldAbility(45f, 600f, 60f * 2f, 200f));
 
         // ⑥ 电磁第二血条
         HIEmpAbility emp = new HIEmpAbility();

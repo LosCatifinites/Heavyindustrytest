@@ -52,7 +52,8 @@ public class HIExtraBullets{
 
         // ---------- 轨道主炮 ----------
         railBullet = new RailBulletType();
-        railBullet.shootEffect = Fx.railShoot;
+        // 开火特效：官方轨道炮闪光 + 自定义重炮口焰（自带泛光）
+        railBullet.shootEffect = new mindustry.entities.effect.MultiEffect(Fx.railShoot, HIEffects.muzzleHeavy);
         railBullet.length = 420f;
         railBullet.pointEffectSpace = 60f;
         railBullet.pierceEffect = Fx.railHit;

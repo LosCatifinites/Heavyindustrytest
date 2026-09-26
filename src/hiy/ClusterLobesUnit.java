@@ -16,7 +16,6 @@ import mindustry.gen.Groups;
 import mindustry.gen.Healthc;
 import mindustry.gen.Teamc;
 import mindustry.gen.Unit;
-import mindustry.gen.UnitEntity;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Trail;
@@ -35,6 +34,14 @@ import mindustry.graphics.Trail;
  *   2. resistCont 转化为护甲与伤害减免（上限 30%）
  *   3. 每 60 帧朝圈上每个顶点发射环状激光
  *   4. 对 80 距离内的敌人持续施加「电磁脉冲」
+ *
+ * ★ 绘制分三层（重要）：
+ *   drawTrails()  —— 尾迹，画在本体之下
+ *   super.draw()  —— 官方 UnitType.draw()：本体 / 武器 / 部件 / 护盾 / 【全部 Ability】
+ *   drawOverlay() —— 自定义环线与眼睛，走 bloom 区间所以会泛光
+ *
+ *   DeepSpace 原作在这里写的是 `//super.draw()`（注释掉了），所以本体、武器、护盾与
+ *   所有 Ability 的视觉效果都不会画。重工业已经加了镜盾/护盾/光环，**必须**调用 super。
  */
 public class ClusterLobesUnit extends HIUnitEntity{
 
@@ -173,66 +180,99 @@ public class ClusterLobesUnit extends HIUnitEntity{
         }
     }
 
+    // ==================================================================
+    //  绘制
+    // ==================================================================
+
     @Override
     public void draw(){
-        if(trailLength > 0){
-            float z = Draw.z();
-            Draw.z(Layer.effect);
-            for(Trail t : trails){
-                t.draw(HIColors.b4, trailWidth);
-            }
-            Draw.z(z);
-        }
+        drawTrails();
 
-        // ---- 环线 ----
+        // ★★★ 官方 UnitType.draw()：
+        //   本体 / 武器 / 部件(HaloPart) / 护盾(drawShield) / 全部 Ability 的 draw
+        //   漏掉这一句，镜盾、光环场、黑洞外环、护盾再生场的效果全都不会显示。
+        super.draw();
+
+        drawOverlay();
+    }
+
+    /** 尾迹（画在本体之下）。 */
+    private void drawTrails(){
+        if(Vars.headless || trailLength <= 0) return;
+
+        float z = Draw.z();
         Draw.z(Layer.effect);
-        Draw.color(HIColors.b4);
-        Lines.stroke(3f);
-        Fill.circle(xx, yy, sint(0.5f, 0.1f, 0f, 5f));
-
-        for(int i = 0; i + 1 < outsideRing.length; i++){
-            Vec2 cur = outsideRing[i], next = outsideRing[i + 1];
-            Lines.line(cur.x + x, cur.y + y, next.x + x, next.y + y, false);
+        for(Trail t : trails){
+            t.draw(HIColors.b4, trailWidth);
         }
-        Lines.line(outsideRing[0].x + x, outsideRing[0].y + y,
-                   outsideRing[outsideRing.length - 1].x + x,
-                   outsideRing[outsideRing.length - 1].y + y, false);
+        Draw.z(z);
+    }
 
-        // ---- 圈上的脉动三角 ----
-        for(int i = 0; i < outsideRing.length; i++){
-            Vec2 it = outsideRing[i];
-            float fl = 10f * Mathf.sin(Time.time * 0.1f - i) + 6f;
-            Drawf.tri(x + it.x, y + it.y, 8f, 8f + fl, it.angle());
-            Drawf.tri(x + it.x, y + it.y, 8f, -8f - fl, it.angle());
-        }
+    /**
+     * 自定义环线与眼睛。
+     *
+     * 发光的部分（环线 / 三角形 / 尖刺 / 眼睛 / 内环）走 {@link HIGlow}，
+     * 也就是提交到 Layer.effect 上 —— 正好在 Mindustry 的 bloom 捕获区间内，所以会泛光。
+     * 黑色底盘环留在 bloom 区间之外（Layer.bullet 之下），保持"实心挡光"的观感。
+     */
+    private void drawOverlay(){
+        if(Vars.headless) return;
 
-        // ---- 本体尖刺 ----
-        for(int i = 0; i < tris.length; i++){
-            Vec2 it = tris[i];
-            it.setLength(10f * Mathf.sin(Time.time * 0.1f - i) + 24f /* Vec2(0,24).len() */ + 8f);
-            Drawf.tri(x + it.x, y + it.y, 8f, 40f, it.angle());
-        }
+        HIGlow.draw(() -> {
+            // ---- 环线 ----
+            Draw.color(HIColors.b4);
+            Lines.stroke(3f);
+            Fill.circle(xx, yy, sint(0.5f, 0.1f, 0f, 5f));
 
-        // ---- one 光环 ----
-        Lines.stroke(sint(0.5f, 0.2f, 0f, 8f));
-        Lines.circle(x, y, 24f);
+            for(int i = 0; i + 1 < outsideRing.length; i++){
+                Vec2 cur = outsideRing[i], next = outsideRing[i + 1];
+                Lines.line(cur.x + x, cur.y + y, next.x + x, next.y + y, false);
+            }
+            Lines.line(outsideRing[0].x + x, outsideRing[0].y + y,
+                       outsideRing[outsideRing.length - 1].x + x,
+                       outsideRing[outsideRing.length - 1].y + y, false);
 
-        // ---- 眼睛：玩家操控时看准星，否则看目标 ----
-        Unit playUnit = Vars.player == null ? null : Vars.player.unit();
-        float ang;
-        if(playUnit == this){
-            ang = Angles.angle(x, y, aimX, aimY);
-        }else if(target != null){
-            ang = Angles.angle(x, y, target.getX(), target.getY());
-        }else{
-            ang = 0f;
-        }
-        eye.setAngle(Angles.moveToward(eye.angle(), ang, 6f * Time.delta));
-        Fill.circle(x + eye.x, y + eye.y, sint(0.5f, 0.1f, 0f, 5f));
+            // ---- 圈上的脉动三角 ----
+            for(int i = 0; i < outsideRing.length; i++){
+                Vec2 it = outsideRing[i];
+                float fl = 10f * Mathf.sin(Time.time * 0.1f - i) + 6f;
+                Drawf.tri(x + it.x, y + it.y, 8f, 8f + fl, it.angle());
+                Drawf.tri(x + it.x, y + it.y, 8f, -8f - fl, it.angle());
+            }
 
-        // ---- 黑色底盘环 ----
+            // ---- 本体尖刺 ----
+            for(int i = 0; i < tris.length; i++){
+                Vec2 it = tris[i];
+                it.setLength(10f * Mathf.sin(Time.time * 0.1f - i) + 24f + 8f);
+                Drawf.tri(x + it.x, y + it.y, 8f, 40f, it.angle());
+            }
+
+            // ---- 内环 ----
+            Lines.stroke(sint(0.5f, 0.2f, 0f, 8f));
+            Lines.circle(x, y, 24f);
+
+            // ---- 眼睛：玩家操控时看准星，否则看目标 ----
+            Unit playUnit = Vars.player == null ? null : Vars.player.unit();
+            float ang;
+            if(playUnit == this){
+                ang = Angles.angle(x, y, aimX, aimY);
+            }else if(target != null){
+                ang = Angles.angle(x, y, target.getX(), target.getY());
+            }else{
+                ang = 0f;
+            }
+            eye.setAngle(Angles.moveToward(eye.angle(), ang, 6f * Time.delta));
+            Fill.circle(x + eye.x, y + eye.y, sint(0.5f, 0.1f, 0f, 5f));
+
+            Draw.reset();
+
+            // ---- 光源：让整团特效在暗处也发光（真正的"泛光"来源之一）----
+            Drawf.light(x, y, rs * 1.9f, HIColors.b4, 0.45f);
+        });
+
+        // ---- 黑色底盘环（保持在 bloom 区间之外，压在最下层）----
         Draw.color(Color.black);
-        Draw.z(99.9f);
+        Draw.z(Layer.bullet - 1f);
         Fill.circle(x, y, 24f);
         Draw.reset();
     }
