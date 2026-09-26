@@ -203,10 +203,10 @@ public class HIUnits{
         clusterLobes.abilities.add(emp);
 
         // ⑦ 母舰：多点多周期孵化（EU「湮灭」4 个孵化点同款）
-        clusterLobes.abilities.add(spawn(welder, 60f * 14f, 9.5f, 0f, 4f));
-        clusterLobes.abilities.add(spawn(welder, 60f * 14f, -9.5f, 0f, 4f));
-        clusterLobes.abilities.add(spawn(welder, 60f * 22f, 22f, 0f, 3f));
-        clusterLobes.abilities.add(spawn(welder, 60f * 22f, -22f, 0f, 3f));
+        clusterLobes.abilities.add(spawn(welder, 60f * 14f, 9.5f, 0f, 4));
+        clusterLobes.abilities.add(spawn(welder, 60f * 14f, -9.5f, 0f, 4));
+        clusterLobes.abilities.add(spawn(welder, 60f * 22f, 22f, 0f, 3));
+        clusterLobes.abilities.add(spawn(welder, 60f * 22f, -22f, 0f, 3));
 
         // ⑧ 死亡爆发 + 瘫痪（EU「海幻」同款）
         HIDeathBlastAbility death = new HIDeathBlastAbility();
