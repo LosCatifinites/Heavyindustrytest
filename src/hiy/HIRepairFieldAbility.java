@@ -1,6 +1,7 @@
 package hiy;
 
 import arc.util.Time;
+import mindustry.entities.Effect;
 import mindustry.entities.Units;
 import mindustry.entities.abilities.Ability;
 import mindustry.gen.Unit;
@@ -24,6 +25,8 @@ public class HIRepairFieldAbility extends Ability{
     public float reload = 30f;
     /** 是否也修己方单位。 */
     public boolean healUnits = false;
+    /** 每次结算时在目标处播放的特效。 */
+    public Effect healEffect;
 
     protected float timer;
 
@@ -41,6 +44,7 @@ public class HIRepairFieldAbility extends Ability{
         Units.nearbyBuildings(unit.x, unit.y, range, b -> {
             if(b.team != unit.team || b.health >= b.maxHealth) return;
             b.heal(base + b.maxHealth * pct);
+            if(healEffect != null) healEffect.at(b.x, b.y, 0f, HIColors.b4);
         });
 
         if(healUnits){

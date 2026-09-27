@@ -39,6 +39,9 @@ public class HIUnits{
     public static HIUnitType clusterLobes;
 
     public static void load(){
+        // ★ 先挂特效（builds spawnCombo / deathExtra，后面装配要用）
+        HIFx.apply();
+
         loadWelder();
         loadClusterLobes();
     }
@@ -84,6 +87,7 @@ public class HIUnits{
         HIRepairFieldAbility repair = new HIRepairFieldAbility();
         repair.range = 95f;
         repair.amount = 26f;
+        repair.healEffect = HIFx.overdriveBlockFull;
         repair.reload = 30f;
         welder.abilities.add(repair);
     }
@@ -159,7 +163,7 @@ public class HIUnits{
         forge.chargePerDamage = 0.0022f;
         forge.decayPerSecond = 0.05f;
         forge.damageReductionMax = 0.55f;
-        forge.absorbEffect = HIEffects.polyHit;
+        forge.absorbEffect = HIFx.teleportOut;
         clusterLobes.abilities.add(forge);
 
         // ② 镜盾：按角度反射
@@ -171,12 +175,14 @@ public class HIUnits{
         mirror.reflectSpeedScl = 1.3f;
         mirror.reflectDamageScl = 1.6f;
         mirror.spin = 0.35f;
+        mirror.reflectEffect = HIFx.scatheSlash;
         clusterLobes.abilities.add(mirror);
 
         // ③ 修复场（EU「神谕/海幻」同款思路）
         HIRepairFieldAbility repair = new HIRepairFieldAbility();
         repair.range = 150f;
         repair.amount = 55f;
+        repair.healEffect = HIFx.overdriveBlockFull;
         repair.reload = 30f;
         clusterLobes.abilities.add(repair);
 
@@ -191,6 +197,7 @@ public class HIUnits{
         aura.enemyStatusDuration = 2f;
         aura.enemyDamage = 0f;
         aura.color = HIColors.b4;
+        aura.pulseEffect = HIFx.overdriveBlockFull;
         clusterLobes.abilities.add(aura);
 
         // ⑤ 护盾再生场（官方 ShieldRegenFieldAbility，EU「湮灭」同款）
@@ -215,7 +222,8 @@ public class HIUnits{
         death.range = 200f;
         death.damage = 2600f;
         death.paralyze = 60f * 4f;
-        death.effect = HIEffects.polyHit;
+        death.effect = HIFx.coreExplosion;
+        death.extraEffect = HIFx.deathExtra;
         clusterLobes.abilities.add(death);
 
         // ⑨ 黑洞 / 能量吸引（外环拉伸）
@@ -274,7 +282,7 @@ public class HIUnits{
         w.shootSound = mindustry.gen.Sounds.shootForeshadow;
         w.bullet = new BulletType(){{
             shootEffect = Fx.sparkShoot;
-            hitEffect = Fx.pointHit;
+            hitEffect = HIFx.sparkExplosion;
             maxRange = 288f;
             damage = 45f;
         }};
@@ -308,6 +316,7 @@ public class HIUnits{
         a.limit = limit;
         a.amount = 1;
         a.spread = 18f;
+        a.spawnEffect = HIFx.spawnCombo;
         return a;
     }
 

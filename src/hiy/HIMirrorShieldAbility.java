@@ -7,6 +7,7 @@ import arc.graphics.g2d.Lines;
 import arc.math.Angles;
 import arc.scene.ui.layout.Table;
 import arc.util.Time;
+import mindustry.entities.Effect;
 import mindustry.entities.abilities.Ability;
 import mindustry.gen.Bullet;
 import mindustry.gen.Groups;
@@ -59,6 +60,8 @@ public class HIMirrorShieldAbility extends Ability{
     /** 护盾基础不透明度（之前太淡，这里调高）。 */
     public float baseAlpha = 0.34f;
     public Color color = HIColors.b4;
+    /** 反射成功时的特效。 */
+    public Effect reflectEffect;
 
     protected float timer;
     /** 受击闪烁 0~1。 */
@@ -101,6 +104,8 @@ public class HIMirrorShieldAbility extends Ability{
         b.vel.setAngle(ang).setLength(out);
         b.damage *= reflectDamageScl;
         b.time = Math.max(b.time - reflectTimeBonus, 0f);
+
+        if(reflectEffect != null) reflectEffect.at(b.x, b.y, ang, color);
     }
 
     @Override

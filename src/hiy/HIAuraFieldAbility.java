@@ -7,6 +7,7 @@ import arc.math.Angles;
 import arc.math.Mathf;
 import arc.scene.ui.layout.Table;
 import arc.util.Time;
+import mindustry.entities.Effect;
 import mindustry.entities.Units;
 import mindustry.entities.abilities.Ability;
 import mindustry.gen.Unit;
@@ -52,6 +53,8 @@ public class HIAuraFieldAbility extends Ability{
     public float stroke = 2.5f;
     public int ticks = 24;
     public float spin = 0.25f;
+    /** 每次结算时在本体处播放的特效。 */
+    public Effect pulseEffect;
 
     protected float timer;
     protected float phase;
@@ -64,6 +67,8 @@ public class HIAuraFieldAbility extends Ability{
         timer += Time.delta;
         if(timer < reload) return;
         timer = 0f;
+
+        if(pulseEffect != null) pulseEffect.at(unit.x, unit.y, 0f, color);
 
         Units.nearby(unit.team, unit.x, unit.y, range, u -> {
             if(u == unit && !affectSelf) return;

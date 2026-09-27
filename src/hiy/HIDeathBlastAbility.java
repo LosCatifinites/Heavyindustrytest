@@ -30,6 +30,8 @@ public class HIDeathBlastAbility extends Ability{
     /** 瘫痪时是否禁足。 */
     public boolean paralyzeMovement = true;
     public Effect effect;
+    /** 额外特效（可叠加，例如核心冲击波）。 */
+    public Effect extraEffect;
 
     @Override
     public void death(Unit unit){
@@ -46,6 +48,7 @@ public class HIDeathBlastAbility extends Ability{
         }
 
         if(effect != null) effect.at(unit.x, unit.y, range);
+        if(extraEffect != null) extraEffect.at(unit.x, unit.y, range);
     }
 
     @Override
