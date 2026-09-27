@@ -167,18 +167,22 @@ public class HIEffects{
             Drawf.light(e.x, e.y, 70f, HIColors.b4, 0.6f * e.fout());
         });
 
-        // ---------- ③ 空间撕裂（NH 坍缩爆炸复刻）----------
-        spaceTear = new Effect(90f, 900f, e -> {
-            float rad = 132f;
+        // ---------- ③ 空间撕裂（NH 坍缩爆炸复刻，已大幅缩小 + 降亮）----------
+        //   NH 原版 rad=132、外环 = rad*3 ≈ 396、中心纯白实心 Fill → 跨度近 800px，
+        //   挂在每 3 秒 12 发的主炮弹上会整屏糊白。这里：
+        //     rad 132→46（跨度 ~270px）、三角 24→14、中心不再用纯白、光源半径与强度减半。
+        //   并且改挂到**轨道主炮命中**（reload 120，约 2 秒一发），局部展示。
+        spaceTear = new Effect(70f, 520f, e -> {
+            float rad = 46f;
             rand.setSeed(e.id);
 
-            Draw.color(Color.white, e.color, Math.min(e.fin() + 0.4f, 1f));
+            Draw.color(HIColors.b4, e.color, Math.min(e.fin() + 0.4f, 1f));
             float circleRad = e.fin(Interp.circleOut) * rad * 3f;
-            Lines.stroke(10f * e.fout());
+            Lines.stroke(5.5f * e.fout());
             Lines.circle(e.x, e.y, circleRad);
 
-            // 24 根随机放射的撕裂三角
-            for(int i = 0; i < 24; i++){
+            // 14 根随机放射的撕裂三角
+            for(int i = 0; i < 14; i++){
                 Tmp.v1.set(1f, 0f).setToRandomDirection(rand).scl(circleRad);
                 Drawf.tri(e.x + Tmp.v1.x, e.y + Tmp.v1.y,
                     rand.random(circleRad / 16f, circleRad / 12f) * e.fout(),
@@ -186,19 +190,21 @@ public class HIEffects{
                     Tmp.v1.angle() - 180f);
             }
 
-            // 中心闪光 + 溅射细线
-            e.scaled(45f, i -> {
-                Draw.color(Color.white, i.color, Math.min(i.fin() + 0.4f, 1f));
-                Fill.circle(i.x, i.y, rad * i.fout());
-                Lines.stroke(14f * i.fout());
+            // 中心闪光 + 溅射细线（降不透明度，避免糊成白团）
+            e.scaled(32f, i -> {
+                Draw.color(HIColors.b4, i.color, Math.min(i.fin() + 0.4f, 1f));
+                Draw.alpha(0.5f * i.fout());
+                Fill.circle(i.x, i.y, rad * i.fout() * 0.75f);
+                Draw.alpha(1f);
+                Lines.stroke(7f * i.fout());
                 Lines.circle(i.x, i.y, i.fin(Interp.circleOut) * rad * 1.2f);
-                Angles.randLenVectors(i.id, 30, rad / 3f, rad * i.fin(Interp.pow2Out), (x, y) -> {
-                    Lines.lineAngle(i.x + x, i.y + y, Mathf.angle(x, y), i.fslope() * 22f + 8f);
+                Angles.randLenVectors(i.id, 18, rad / 3f, rad * i.fin(Interp.pow2Out), (x, y) -> {
+                    Lines.lineAngle(i.x + x, i.y + y, Mathf.angle(x, y), i.fslope() * 14f + 6f);
                 });
             });
 
             Draw.reset();
-            Drawf.light(e.x, e.y, rad * 2.2f, e.color, 0.8f * e.fout());
+            Drawf.light(e.x, e.y, rad * 2.2f, e.color, 0.35f * e.fout());
         });
     }
 

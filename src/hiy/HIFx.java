@@ -19,17 +19,17 @@ import mindustry.entities.effect.MultiEffect;
  * ─────────────────────────────────────────────────────────────
  *  主炮弹 · 开火       Fx.shootQuellPulse
  *  主炮弹 · 飞行拖尾   Fx.missileTrailShort
- *  主炮弹 · 命中       空间撕裂（NH 坍缩爆炸复刻）
+ *  主炮弹 · 命中       Fx.sparkExplosion（射速快，用轻特效）
  *  主炮弹 · 消散       Fx.squareWaveEffect
  *  分裂弹 · 命中/消散  Fx.dynamicSpikes
  *  环状激光 · 发射     Fx.lancerLaserShoot
  *  环状激光 · 命中     Fx.lightningCharge
  *  轨道炮 · 开火       Fx.railShoot + HIEffects.muzzleHeavy
  *  轨道炮 · 穿透       Fx.scatheSlash
- *  轨道炮 · 命中       Fx.scatheExplosion
+ *  轨道炮 · 命中       ★ 空间撕裂（NH 坍缩爆炸复刻，缩小版）
  *  曳光弹 · 命中       Fx.sparkExplosion
  *  点防御 · 命中       Fx.sparkExplosion
- *  空中爆点 · 命中     Fx.coreBuildShockwave
+ *  空中爆点 · 命中     Fx.scatheExplosion
  * ─────────────────────────────────────────────────────────────
  *  防御环节            特效
  * ─────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ import mindustry.entities.effect.MultiEffect;
  *  镜盾 · 反射成功     Fx.scatheSlash
  *  修复场 · 每次结算   Fx.overdriveBlockFull
  *  光环场 · 每次结算   Fx.overdriveBlockFull
- *  母舰 · 孵化子单位   Fx.coreLaunchConstruct + Fx.rotateBlock
+ *  （孵化模块已随 welder 一并移除；spawnCombo 仍保留备用）
  *  死亡 · 爆发         Fx.coreExplosion
  *  死亡 · 附加         Fx.breakProp + Fx.coreBuildShockwave
  * ─────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ public class HIFx{
         HIBullets.clusterBullet.shootEffect = shootQuellPulse;
         HIBullets.clusterBullet.trailEffect = missileTrailShort;
         HIBullets.clusterBullet.trailChance = 0.35f;
-        HIBullets.clusterBullet.hitEffect = HIEffects.spaceTear;   // ★ 空间撕裂
+        HIBullets.clusterBullet.hitEffect = sparkExplosion;       // 主炮弹射速快，用轻特效
         HIBullets.clusterBullet.despawnEffect = squareWave;
 
         // ---- 分裂弹 ----
@@ -91,14 +91,14 @@ public class HIFx{
         HIBullets.ringLaser.hitEffect = lightningCharge;
 
         // ---- 轨道炮 ----
-        HIExtraBullets.railBullet.hitEffect = scatheExplosion;
+        HIExtraBullets.railBullet.hitEffect = HIEffects.spaceTear;   // ★ 空间撕裂（唯一展示位，约 2 秒一发）
         HIExtraBullets.railBullet.pierceEffect = scatheSlash;
 
         // ---- 曳光弹 ----
         HIExtraBullets.tracerBullet.hitEffect = sparkExplosion;
 
         // ---- 空中爆点 ----
-        HIExtraBullets.airburstBullet.hitEffect = coreBuildShockwave;
+        HIExtraBullets.airburstBullet.hitEffect = scatheExplosion;
     }
 
     private HIFx(){

@@ -11,7 +11,6 @@ import mindustry.entities.pattern.ShootMulti;
 import mindustry.entities.pattern.ShootPattern;
 import mindustry.type.ItemStack;
 import mindustry.type.StatusEffect;
-import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 import mindustry.type.weapons.PointDefenseWeapon;
 
@@ -25,15 +24,13 @@ import mindustry.type.weapons.PointDefenseWeapon;
  *   【移动模块】  引擎 / 尾迹 / 光照
  *   【功能模块】  载运 / 采矿 / 物品容量
  *   【武器模块】  蓄力主炮 / 点防御 / 轨道炮 / 曳光弹 / 空中爆点
- *   【能力模块】  锻炉 / 镜盾 / 修复场 / 光环场 / 护盾再生场 / 电磁 / 母舰孵化 / 死亡爆发
+ *   【能力模块】  锻炉 / 镜盾 / 修复场 / 光环场 / 护盾再生场 / 电磁 / 死亡爆发
  *   【视觉模块】  光环部件 / 黑洞外环
  *
- * 注册顺序：被生成的单位必须先建（母舰的孵化能力直接引用 welder）。
+ * 注册顺序：HIFx.apply() 必须在最前（它构建 spawnCombo / deathExtra 两个组合特效）。
  */
 public class HIUnits{
 
-    /** 工蜂：装配母舰生成的小型采矿/维修单位（暂无专属贴图，兜底用原版 flare）。 */
-    public static HIUnitType welder;
 
     /** 裂片集群：重工业的主力旗舰。 */
     public static HIUnitType clusterLobes;
@@ -42,54 +39,7 @@ public class HIUnits{
         // ★ 先挂特效（builds spawnCombo / deathExtra，后面装配要用）
         HIFx.apply();
 
-        loadWelder();
         loadClusterLobes();
-    }
-
-    // ==================================================================
-    //  工蜂（模块：移动 / 采矿 / 光照 / 修复）
-    // ==================================================================
-    private static void loadWelder(){
-        welder = HIUnitType.create("welder", HIUnitEntity::new);
-        welder.fallbackRegion = "flare";
-
-        // ---- 基础模块 ----
-        welder.health = 900f;
-        welder.armor = 2f;
-        welder.hitSize = 10f;
-        welder.speed = 3.4f;
-        welder.accel = 0.09f;
-        welder.drag = 0.06f;
-        welder.rotateSpeed = 9f;
-        welder.flying = true;
-        welder.lowAltitude = true;
-        welder.engineSize = 0f;
-        welder.itemCapacity = 20;
-
-        // ---- 移动模块：引擎 ----
-        welder.engines.add(new UnitType.UnitEngine(0f, -4.5f, 2.2f, -90f));
-
-        // ---- 移动模块：尾迹 ----
-        welder.trailLength = 10;
-        welder.trailScl = 1.4f;
-
-        // ---- 光照模块 ----
-        welder.lightRadius = 60f;
-        welder.lightOpacity = 0.12f;
-
-        // ---- 功能模块：采矿 ----
-        welder.mineWalls = true;
-        welder.mineFloor = true;
-        welder.mineTier = 2;
-        welder.mineSpeed = 3f;
-
-        // ---- 能力模块：修复场 ----
-        HIRepairFieldAbility repair = new HIRepairFieldAbility();
-        repair.range = 95f;
-        repair.amount = 26f;
-        repair.healEffect = HIFx.overdriveBlockFull;
-        repair.reload = 30f;
-        welder.abilities.add(repair);
     }
 
     // ==================================================================
@@ -210,13 +160,6 @@ public class HIUnits{
         emp.empFraction = 0.3f;
         emp.empRepairPerSecond = 0.015f;
         clusterLobes.abilities.add(emp);
-
-        // ⑦ 母舰：多点多周期孵化（EU「湮灭」4 个孵化点同款）
-        clusterLobes.abilities.add(spawn(welder, 60f * 14f, 9.5f, 0f, 4));
-        clusterLobes.abilities.add(spawn(welder, 60f * 14f, -9.5f, 0f, 4));
-        clusterLobes.abilities.add(spawn(welder, 60f * 22f, 22f, 0f, 3));
-        clusterLobes.abilities.add(spawn(welder, 60f * 22f, -22f, 0f, 3));
-
         // ⑧ 死亡爆发 + 瘫痪（EU「海幻」同款）
         HIDeathBlastAbility death = new HIDeathBlastAbility();
         death.range = 200f;
@@ -306,18 +249,6 @@ public class HIUnits{
         w.shootSound = mindustry.gen.Sounds.shootForeshadow;
         w.bullet = HIExtraBullets.railBullet;
         return w;
-    }
-
-    /** 孵化能力工厂。 */
-    private static HIUnitSpawnAbility spawn(UnitType child, float time, float sx, float sy, int limit){
-        HIUnitSpawnAbility a = new HIUnitSpawnAbility(child, time);
-        a.sX = sx;
-        a.sY = sy;
-        a.limit = limit;
-        a.amount = 1;
-        a.spread = 18f;
-        a.spawnEffect = HIFx.spawnCombo;
-        return a;
     }
 
     private HIUnits(){

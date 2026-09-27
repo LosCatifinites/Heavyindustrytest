@@ -100,11 +100,11 @@ public class HIAuraFieldAbility extends Ability{
             float pulse = Mathf.absin(Time.time * 0.05f, 1f, 1f);
 
             Draw.color(color);
-            Draw.alpha(0.22f + 0.10f * Math.abs(pulse));
+            Draw.alpha(0.15f + 0.07f * Math.abs(pulse));
             Lines.stroke(stroke + pulse * 0.8f);
             Lines.circle(ux, uy, range);
 
-            Draw.alpha(0.65f);
+            Draw.alpha(0.45f);
             Lines.stroke(stroke);
             float rot = Time.time * spin;
             for(int i = 0; i < ticks; i++){
